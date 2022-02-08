@@ -1,0 +1,48 @@
+###############################################################################
+# Dependencies
+###############################################################################
+import os
+import time
+import glob
+import argparse
+import numpy as np
+
+from maps import geo
+from utils import ios
+from facebook.population import FacebookPopulation
+
+###############################################################################
+# Functions
+###############################################################################
+
+def run(root, years):
+  fn_pop, fn_places = ios.get_data_and_places_file(root, years, 'population')
+
+  # load data
+  fb = FacebookPopulation(fn_pop=fn_pop, fn_places=fn_places)
+  fb.load_data()
+  fb.project_data()
+
+  # update features
+  df_places_new = fb.update_population_features()
+  print(df_places_new.head())
+  print(df_places_new.shape)
+
+  # save
+  fn_places_new = fn_places.replace(".csv","_population.csv")
+  ios.save_csv(df_places_new, fn_places_new)
+
+
+###############################################################################
+# Main
+###############################################################################
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser()
+    parser.add_argument("-r", help="Country's main folder.", type=str, required=True)
+    parser.add_argument("-y", help="Year or years separated by comma (E.g. 2016,2019).", type=str, required=True)
+    args = parser.parse_args()
+    for arg in vars(args):
+      print("{}: {}".format(arg, getattr(args, arg)))
+    start_time = time.time()
+    run(args.r, args.y)
+    print("--- %s seconds ---" % (time.time() - start_time))
