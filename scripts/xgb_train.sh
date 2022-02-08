@@ -8,13 +8,13 @@ while getopts ":r:y:d:t:r:v:" opt; do
     ;;
     y) years="$OPTARG"
     ;;
-    o) dhsloc="$OPTARG"
+    d) dhsloc="$OPTARG"
     ;;
     t) traintype="$OPTARG"
     ;;
-    k) isregression="$OPTARG"
+    r) isregression="$OPTARG"
     ;;
-    e) viirnorm="$OPTARG"
+    v) viirnorm="$OPTARG"
     ;;
     \?) echo "Invalid option -$OPTARG" >&2
     ;;
