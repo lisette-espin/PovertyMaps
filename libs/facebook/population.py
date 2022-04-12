@@ -17,7 +17,13 @@ import pandas as pd
 from maps import geo
 from utils import ios
 from tqdm import tqdm 
-from ses.data import delete_nonprojected_variables
+from utils.validations import delete_nonprojected_variables
+
+###########################################################################
+# Constants
+###########################################################################
+
+from utils.constants import METERS
 
 ###########################################################################
 # Functions
@@ -26,7 +32,7 @@ from ses.data import delete_nonprojected_variables
 class FacebookPopulation(object):
 
   def __init__(self, fn_pop=None, fn_places=None):
-    self.fn_places = fn_places  # dhs clusters or populated places
+    self.fn_places = fn_places  # clusters or populated places
     self.fn_pop = fn_pop
     self.gdf_places = None
     self.gdf_pop = None
@@ -42,14 +48,15 @@ class FacebookPopulation(object):
     if self.fn_pop is not None:
       self.gdf_pop = geo.load_as_GeoDataFrame(fn=self.fn_pop, index_col=None, lat='Lat', lon='Lon', crs=crs_from)
 
-    ### dhs data or poppulated places
+    ### clusters or poppulated places
     if self.fn_places is not None:
-      try:
-        # dhs
-        self.gdf_places = geo.load_as_GeoDataFrame(fn=self.fn_places, index_col=0, lat='LATNUM', lon='LONGNUM', crs=crs_from)
-      except:
-        # populated places
-        self.gdf_places = geo.load_as_GeoDataFrame(fn=self.fn_places, index_col=0, lat='lat', lon='lon', crs=crs_from)
+      self.gdf_places = geo.load_as_GeoDataFrame(fn=self.fn_places, index_col=0, lat='lat', lon='lon', crs=crs_from)
+      # try:
+      #   # dhs
+      #   self.gdf_places = geo.load_as_GeoDataFrame(fn=self.fn_places, index_col=0, lat='LATNUM', lon='LONGNUM', crs=crs_from)
+      # except:
+      #   # populated places
+      #   self.gdf_places = geo.load_as_GeoDataFrame(fn=self.fn_places, index_col=0, lat='lat', lon='lon', crs=crs_from)
 
   def project_data(self, crs_to=geo.PROJ_MET):
     '''
@@ -60,25 +67,29 @@ class FacebookPopulation(object):
     self.gdf_places_proj = geo.get_projection(self.gdf_places, crs_to)
     self.gdf_pop_proj = geo.get_projection(self.gdf_pop, crs_to)
     self.index_pop = self.gdf_pop_proj.sindex
-    # deleting unnecesary variables and columns
+    # deleting unnecesary variables
     del(self.gdf_pop)
     del(self.gdf_places)
     gc.collect()
+    # deleting unnecesary columns
     self.gdf_places_proj = delete_nonprojected_variables(self.gdf_places_proj, os.path.basename(__file__))
     
-  def update_population_features(self):
+  def update_population_features(self, meters=METERS):
     '''
-    For each survey record (dhs-cluster or populated place) it adds all features abut population
+    For each survey record (gt-cluster or populated place) it adds all features about population
     from facebook data (high resolution maps).
     '''
     # nearest
-    gdf_nearest, dist = geo.fast_find_nearest_per_record(self.gdf_places_proj, self.gdf_pop_proj)
-
+    print('Matching nearest data point... (it might take a while)')
+    with tqdm(total=1) as pbar:
+      gdf_nearest, dist = geo.fast_find_nearest_per_record(self.gdf_places_proj, self.gdf_pop_proj)
+      pbar.update(1)
+      
     # within area
     within = []
-    for meters in tqdm(geo.METERS, total=len(geo.METERS)):
-      km = round(meters/1000.,1)
-      within.append([self.gdf_pop_proj.iloc[list(self.index_pop.intersection(poly.bounds))].Population.sum() for poly in self.gdf_places_proj.geometry.buffer(meters/2., cap_style=3, join_style=1)])
+    for m in tqdm(meters, total=len(meters)):
+      km = round(m/1000.,2)
+      within.append([self.gdf_pop_proj.iloc[list(self.index_pop.intersection(poly.bounds))].Population.sum() for poly in self.gdf_places_proj.geometry.buffer(m/2., cap_style=3, join_style=1)])
 
     # results
     results = []
@@ -88,8 +99,8 @@ class FacebookPopulation(object):
     results.append(pd.Series(gdf_nearest.Population / dist, name='population_grav_1'))
     results.append(pd.Series(gdf_nearest.Population / dist**1.5, name='population_grav_1.5'))
     results.append(pd.Series(gdf_nearest.Population / dist**2, name='population_grav_2'))
-    for w,k in zip(*[within,geo.METERS]):
-      k = round(k/1000.,1)
+    for w,k in zip(*[within,meters]):
+      k = round(k/1000.,2)
       results.append(pd.Series(w, name='population_in_{}km'.format(k)))
 
     return pd.concat(results, axis=1).drop(columns='geometry')

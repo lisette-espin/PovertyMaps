@@ -22,12 +22,8 @@ from geopy.extra.rate_limiter import RateLimiter
 ###########################################################################
 # Constants
 ###########################################################################
-PROJ_DEG = "EPSG:4326" # lon,lat
-PROJ_MET = "EPSG:3857" # meters
-KM_TO_M = 1000
-MILE_TO_M = 1609.34
-DEGREE_TO_M = 111000
-METERS = [MILE_TO_M, KM_TO_M*2, KM_TO_M*5, KM_TO_M*10]
+
+from utils.constants import *
 
 ###########################################################################
 # Functions
@@ -61,6 +57,7 @@ def find_places_sqm(gdf_proj, point_proj, width=MILE_TO_M):
   return gdf_proj[~tmp.is_empty]
 
 def fast_find_nearest_per_record(gdfa, gdfb, dropgeometry=True):
+  ### for each a, find closest in b
   pointsa = np.array(list(gdfa.geometry.apply(lambda x: (x.x, x.y))))
   pointsb = np.array(list(gdfb.geometry.apply(lambda x: (x.x, x.y))))
   treea = cKDTree(pointsa)

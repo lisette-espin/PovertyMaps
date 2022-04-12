@@ -295,6 +295,7 @@ def plot_pred_true(pred, true, metrics, fn=None):
       else:
         ax.set_ylabel('')
       
+        ### Legend (general all outputs)
         if c==cols-1:
           text = []
           for k,v in metrics.items():
@@ -310,7 +311,7 @@ def plot_pred_true(pred, true, metrics, fn=None):
           text.append(f"Corr_pred={corr_pred:.2f},{pv_pred:.2f}")
           ax.legend([h]*len(text), text, title='Evaluation', markerscale=0, handlelength=0, loc='center left', bbox_to_anchor=(1, 0.5))
       
-    plt.suptitle("Out-of-sample Performance", y=1.05)
+    #plt.suptitle("Out-of-sample Performance", y=1.05)
       
     if fn is not None:
       plt.savefig(fn, bbox_inches='tight')
@@ -323,33 +324,40 @@ def plot_pred_true(pred, true, metrics, fn=None):
 # Functions: Classification performance
 ################################################################
 
-def plot_confusion_matrix(ytest, ypred, labels=None, norm=False, fn=None):
-
+def plot_confusion_matrix(ytest, ypred, labels=None, norm=False, vmin=None, vmax=None, cbar=True, fn=None):
+    ses = False
+    
     if labels is None:
-      labels = sorted(set(ytest) | set(ypred)) #[str(v) for v in sorted(set(ytest) | set(ypred))]
+      labels = sorted(set(ytest) | set(ypred)) 
       
-    cf_matrix = confusion_matrix(ytest, ypred, labels=labels, normalize='true' if norm else None) # true, pred
+    if ('poor' in set(ytest) or 'poor' in set(ypred)) and len(labels)==4:
+      ses = True
+      labels = [l for l in ['poor','lower_middle','upper_middle','rich'] if l in labels]
 
+    cf_matrix = confusion_matrix(ytest, ypred, labels=labels, normalize='true' if norm else None) # true, pred
+    
     with sns.plotting_context("paper", font_scale=FONT_SCALE):
-      w = len(labels)*2
+      w = len(labels)*(2 if cbar else 1.6)
       h = len(labels)*1
 
       plt.figure(figsize=(w,h))
-      ax = sns.heatmap(cf_matrix, annot=True, fmt='.2g', cmap='Blues')
+      ax = sns.heatmap(cf_matrix, annot=True, fmt='.2g', cmap='Blues', vmin=vmin, vmax=vmax, cbar=cbar)
       ax.set_xlabel('Pred')
       ax.set_ylabel('True')
       
-      if type(labels[0]) == str:
+      if type(labels[0]) == str and ses:
         if len([1 for l in labels if len(l)>5]) > 0:
           labels = [''.join([w[0].upper() for w in l.split('_')]) for l in labels]
-        
+          
+
       ax.set_xticklabels(labels)
-      ax.set_yticklabels(labels)
+      ax.set_yticklabels(labels, rotation=90 if ses else 0)
 
       if fn is not None:
         plt.savefig(fn, bbox_inches='tight')
         print('{} saved!'.format(fn))
 
+      plt.show()
       plt.close()
 
 

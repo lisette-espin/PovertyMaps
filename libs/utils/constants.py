@@ -17,14 +17,17 @@ TTYPE_OLDEST = 'oldest'
 TTYPE_NEWEST = 'newest'
 TRAIN_YEAR_TYPES = [TTYPE_ALL, TTYPE_OLDEST, TTYPE_NEWEST]
 
-def validate_traintype(traintype):
-  if traintype not in TRAIN_YEAR_TYPES:
-    raise Exception("train type does not exist.")
-
-def validate_years_traintype(years, traintype):
-  if traintype!=TTYPE_ALL and len(years.split(','))==1:
-    print(f"ERROR: traintype:{traintype} | years:{years} | You need at least 2 years.")
-    raise Exception("train type and years do not match.")
+################################################
+# GEO
+################################################
+PROJ_DEG = "EPSG:4326" # lon,lat
+PROJ_MET = "EPSG:3857" # meters
+PROJ_EOV = "EPSG:23700" # the Uniform National Projection (EOV,
+KM_TO_M = 1000
+MILE_TO_M = 1609.34
+DEGREE_TO_M = 111000
+METERS = [MILE_TO_M, KM_TO_M*2, KM_TO_M*5, KM_TO_M*10]
+MAX_DISTANCE_ANTENNA_METERS = 10
 
 ################################################
 # GOOGLE STATIC MAPS
@@ -37,6 +40,9 @@ ZOOM = 16
 SCALE = 1
 MAPTYPE = "satellite"
 BANDS = 3
+GT_PLACE = 'clusters'
+P_PLACE = 'pplaces'
+GT_AUGM = 'augmented'
 
 ################################################
 # CNN IMAGES
@@ -67,12 +73,180 @@ JUST_EVAL = 2
 TRAIN_FROM_SCRATCH = 3
 PROB_AUGMENTED = 0.5
 N_AUGMENTATIONS = 18
-#COLUMN_TARGET = 'dhs_mean_iwi'
 
 ################################################
-# CNN METADATA
+# FB MARKETING
+################################################
+
+FBM_API_VERSION = 'v13.0' #'v12'
+
+FBM_NOT_YET = -1
+FBM_LOADED_DONE = 0
+FBM_QUERIED = 1
+FBM_SKIP_LOC = 2
+FBM_QUOTA = 3
+FBM_NEEDS_QUERY = 4
+
+FBM_ERR_CODE_WRONG_LOC = 100
+FBM_ERR_SUBCODE_WRONG_LOC = 1487851
+
+FBM_ERR_CODE_QUOTA = 80004
+FBM_ERR_SUBCODE_QUOTA = 2446079
+
+FBM_HQUOTA = 2 # Quota of tokens gets restarted every 2 hours
+FBM_DEFAULT_WRONG_LOCATION = np.nan #-1
+
+# WORKDAYS = [1,2,3,4] # Mon-Thursday (isoweekday)        ## <----------------------------------------------------------------------------------- remove if not used
+# WORKDAYS = [1,2,3,4,5,6,7] # Mon-Thursday (isoweekday)  ## <----------------------------------------------------------------------------------- comment and use the one above
+
+################################################
+# XGB METADATA
 ################################################
 PRECISION = 2
+WEIRD_RS = [2902046601,4261256967,3806232969]
+TIMEVAR_VALIDATIONS = ['deltatime','gdp','gdpp','gdppg','gdppgp','gdpg','gdpgp','gni','gnip']
+
+SOURCE_ANTENNA = 'OCI'
+SOURCE_FBMARKETING = 'FBM'
+SOURCE_NIGHTLIGHT = 'NTLL'
+SOURCE_FBMOVEMENT = 'FBMV'
+SOURCE_FBPOPULATION = 'FBP'
+SOURCE_OPENSTREETMAP = 'OSM'
+COL_POPULATION = 'population_closest_tile'
+
+################################################
+# PLOTS
+################################################
+FONT_SCALE = 1.5
+
+
+################################################
+# UTILS
+################################################
+YES = ['y','yes','1',1,True,'True']
+NO = ['n','no','0',0,False,'False']
+NONE = [None, np.nan, '', 'none', ' ', 'nan', 'None']
+PLOTEXT = 'png'
+COUNTRIES = {'Sierra Leone':{'code':'SL', 'years':'2016,2019', 'tz':'Africa/Freetown'}, 
+             'Uganda':{'code':'UG', 'years':"2016,2018", 'tz':'Africa/Kampala'},
+             'Hungary':{'code':'HU', 'years':'2018', 'tz':'Europe/Budapest'},
+             'Zimbabwe':{'code':'ZW', 'years':'2015', 'tz':'Africa/Harare'},
+             'Ecuador':{'code':'EC', 'years':'2021', 'tz':'America/Guayaquil'}}
+
+REGRESSION_VARS = ['mean_wi','std_wi'] #['dhs_mean_iwi','dhs_std_iwi']
+LON, LAT = 'lon', 'lat'
+RURAL = 'rural'
+OSMID = 'OSMID'
+PPLACE_RURAL_BY_TYPE = ['village', 'hamlet', 'isolated_dwelling']
+YEAR = 'year'
+WEALTH = 'wi'
+CLUSTER = 'cluster'
+YMAX_DHS = 100
+YMAX_INGATLAN = 4
+
+################################################
+# DHS
+################################################
+SES_LABELS = ['poor','lower_middle','upper_middle','rich']
+GTID = 'gtID'
+DHS_RURAL = 2 # R
+N_STD_DEV_OUTLIER = 40
+
+################################################
+# DHSLOC
+################################################
+DHSLOC_OPTIONS = {'none':'No change',
+                  'rc':'Urban no change, Rural to closest rural PPlace progressively'}
+                  # 'cc':'Change to closest PPlace',
+                  # 'ccur':'Change to closest urban/rural PPlace',
+                  # 'gc':'Group survey clusters to closest PPlace',
+                  # 'gcur':'Group survey clusters to closest urban/rural PPlace',
+DISPLACEMENT_M = {0:2000, 1:5000} #0: URBAN, 1:RURAL
+EXTRA = {0:0, 1:10000}
+LABEL = {0:'URBAN', 1:'RURAL'}
+#DISTCOLS = ['dhs_id','dhs_year','dhs_cluster','dhs_rural','dhs_mean_iwi','dhs_std_iwi','OSMID','pplace_dhs_distance','pplace_rural']
+# DISTCOLS = ['cluster_id','cluster_year','cluster_number','cluster_rural','cluster_mean','cluster_std','OSMID','pplace_cluster_distance','pplace_rural']
+DISTCOLS = ['cluster_id','cluster_year','cluster_number','cluster_rural',f'mean_{WEALTH}',f'std_{WEALTH}','OSMID','pplace_cluster_distance','pplace_rural']
+
+
+##############################################################################
+# DHS IWI
+# Betas: https://link.springer.com/article/10.1007/s11205-014-0683-x/tables/1
+# https://globaldatalab.org/iwi/using/
+##############################################################################
+
+### Water supply (hv201)
+### - high quality is bottled water or water piped into dwelling or premises;
+### - middle quality is public tap, protected well, tanker truck, etc.;
+### - low quality is unprotected well, spring, surface water, etc.
+### 30 DUG WELL (OPEN/PROTECTED) , should it go to mid instead of low?
+
+WATER = {'UG':{2006:{'high':[11,12,71],'mid':[13,31,33,34,41,61],'low':[20,21,22,23,30,32,35,36,40,42,43,44,45,46,51,62,91]},
+               2009:{'high':[10,11,12,71],'mid':[13,31,33,34,41,61],'low':[20,21,22,23,30,32,35,40,42,43,44,45,46,51,62]},
+               2011:{'high':[10,11,12,71],'mid':[13,31,33,34,41,61,71,72],'low':[20,21,22,23,30,32,35,36,40,42,43,44,45,46,51,62]},
+               2014:{'high':[11,12,91],'mid':[13,31,41,61,63,71],'low':[21,22,32,42,43,44,51,62,81]},
+               2016:{'high':[11,12,13,91],'mid':[14,31,41,61,63,72,92],'low':[21,32,42,43,51,71,81]},
+               2018:{'high':[11,12,13,91],'mid':[14,31,41,61,63,72,92],'low':[21,32,42,43,51,71,81]}},
+         'SL':{2008:{'high':[10,11,12,71], 'mid':[13,31,41,61], 'low':[20,21,30,32,40,42,43,51,62]},
+               2013:{'high':[10,11,12,91,71], 'mid':[13,31,41,61,92], 'low':[20,21,30,32,40,42,43,51,62]},
+               2016:{'high':[10,11,12,13,71], 'mid':[14,31,41,61,72], 'low':[20,21,30,32,40,42,43,51,62]},
+               2019:{'high':[10,11,12,13,71], 'mid':[14,31,41,61,72], 'low':[20,21,30,32,40,42,43,51,62,81]}},
+         'ZW':{2015:{'high':[10,11,12,13,71], 'mid':[14,31,41,61], 'low':[20,21,30,32,40,42,43,51,62]}}}
+
+                
+### Toilet facility (hv205)
+### - high quality is any kind of private flush toilet; 
+### - middle quality is public toilet, improved pit latrine, etc.;
+### - low quality is traditional pit latrine, hanging toilet, or no toilet facility.
+
+TOILET = {'UG':{2006:{'high':[10,11],'mid':[21,23],'low':[20,22,24,25,30,31,41,42,43]},
+               2009:{'high':[10,11],'mid':[21,23],'low':[20,22,24,25,30,31,41,42,43]},
+               2011:{'high':[1,10,11],'mid':[2,4,21,23],'low':[3,5,6,7,8,9,20,22,24,25,30,31,41,43,44]},
+               2014:{'high':[11,12,13,14,15],'mid':[21,22],'low':[23,24,25,31,41,42,43,51,61]},
+               2016:{'high':[11,12,13,14,15],'mid':[21,22],'low':[23,31,41,42,43,51,61]},
+               2018:{'high':[11,12,13,14,15],'mid':[21,22],'low':[23,31,41,42,43,51,61]}},
+         'SL':{2008:{'high':[10,11,12,13,14,15], 'mid':[21,22], 'low':[20,23,30,31,41,42,43,71]},
+               2013:{'high':[10,11,12,13,14,15], 'mid':[21,22], 'low':[20,23,30,31,41,42,43]},
+               2016:{'high':[10,11,12,13,14,15], 'mid':[21,22], 'low':[20,23,30,31,41,42,43]},
+               2019:{'high':[10,11,12,13,14,15], 'mid':[21,22], 'low':[20,23,30,31,41,42,43]}},
+         'ZW':{2015:{'high':[10,11,12,13,14,15], 'mid':[21,22], 'low':[20,23,30,31,41,42,43]}}}
+
+                          
+### Floor quality (hv213)
+### - high quality is finished floor with parquet, carpet, tiles, ceramic etc.; 
+### - middle quality is cement, concrete, raw wood, etc. 
+### - low quality is none, earth, dung etc., 
+FLOOR = {'UG':{2006:{'high':[30,31,33],'mid':[34,35,36],'low':[10,11,12,20,]},
+               2009:{'high':[30,31,33],'mid':[34,35,36],'low':[10,11,12,20]},
+               2011:{'high':[30,31,33],'mid':[34,35,36],'low':[10,11,12,20]},
+               2014:{'high':[30,31,32],'mid':[21,22,33,34,35],'low':[10,11,12,20]},
+               2016:{'high':[30,31,33,35],'mid':[21,22,32,34,36,37],'low':[10,11,12,20,]},
+               2018:{'high':[30,31,33,35],'mid':[21,22,32,34,36,37],'low':[10,11,12,20]}},
+         'SL':{2008:{'high':[30,31,32,33,35], 'mid':[13,21,22,34], 'low':[10,11,12,20]},                          
+               2013:{'high':[30,31,32,33,35], 'mid':[21,22,34], 'low':[10,11,12,20]},
+               2016:{'high':[31,32,33,35], 'mid':[21,22,34], 'low':[11,12]},
+               2019:{'high':[30,31,32,33,35], 'mid':[21,22,34], 'low':[10,11,12,20]}},
+         'ZW':{2015:{'high':[30,31,32,33,35], 'mid':[21,22,34], 'low':[10,11,12,20]}}} # 22 remove?
+                          
+BETAS = {'hv208':8.612657,  # tv
+         'hv209':8.429076,  # fridge
+         'hv221':7.127699,  # telephone
+         'hv212':4.651382,  # car
+         'hv210':1.846860,  # bike
+         'hv206':8.056664,  # electricity 
+         'hv201':{1:-6.306477,2:-2.302023,3:7.952443},  # water
+         'hv213':{1:-7.558471,2:1.227531, 3:6.107428},  # floor 
+         'hv205':{1:-7.439841,2:-1.090393,3:8.140637},  # toilet
+         'hv216':{1:-3.699681,2:0.384050, 3:3.445009}}  # sleeping rooms
+BETA_CHEAP_UTENSILS = 4.118394     # cheap utensils
+BETA_EXPENSIVE_UTENSILS = 6.507283 # expensive utensils 
+CONSTANT = 25.004470
+
+COLS_SURVEY = ['country','year','survey','hhid','hv001','hv002','hv024','hv025','hv270','hv271','hv005','hv243e','hv211','hv243d','hv243a']
+COLS_SURVEY.extend(BETAS.keys())
+COLS_CLUSTER = ['DHSCC','DHSYEAR','DHSCLUST','URBAN_RURA','LATNUM','LONGNUM','SOURCE','ALT_GPS','ALT_DEM','DATUM']
+
+
 
 # ################################################
 # # XGBOOST
@@ -92,40 +266,3 @@ PRECISION = 2
 # XGB_TUNING_ITER = 100
 # XGB_VERBOSE = 20
 # XGB_SCORING = "neg_mean_squared_error"
-
-
-################################################
-# PLOTS
-################################################
-FONT_SCALE = 1.5
-
-################################################
-# UTILS
-################################################
-YES = ['y','yes','1',1,True,'True']
-NO = ['n','no','0',0,False,'False']
-NONE = [None,np.nan,'','none',' ','nan','None']
-PLOTEXT = 'png'
-COUNTRIES = {'Sierra Leone':'SL', 'Uganda':'UG'}
-
-################################################
-# DHS
-################################################
-SES_LABELS = ['poor','lower_middle','upper_middle','rich']
-
-################################################
-# DHSLOC
-################################################
-DHSLOC_OPTIONS = {'none':'No change',
-                  'cc':'Change to closest PPlace',
-                  'ccur':'Change to closest urban/rural PPlace',
-                  'gc':'Group survey clusters to closest PPlace',
-                  'gcur':'Group survey clusters to closest urban/rural PPlace',
-                  'rc':'Urban no change, Rural to closest rural PPlace progressively'}
-DISPLACEMENT_M = {0:2000, 1:5000} #0: URBAN, 1:RURAL
-EXTRA = {0:0, 1:10000}
-LABEL = {0:'URBAN', 1:'RURAL'}
-DISTCOLS = ['dhs_id','dhs_year','dhs_cluster','dhs_rural','dhs_mean_iwi','dhs_std_iwi','OSMID','pplace_dhs_distance','pplace_rural']
-PPLACE_RURAL = ['village', 'hamlet', 'isolated_dwelling']
-DHS_RURAL = 2
-

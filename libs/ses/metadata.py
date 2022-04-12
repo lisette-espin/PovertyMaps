@@ -3,27 +3,33 @@
 ################################################################################
 import os
 import glob
+import time
+import json
 import numpy as np 
 import pandas as pd
 
 import seaborn as sns
+from tqdm import tqdm
 import matplotlib.pyplot as plt
 
-from xgboost import XGBRegressor
-from xgboost import XGBRFRegressor
+import xgboost as xgb
 
+from scipy.stats import pearsonr
 from sklearn.metrics import r2_score
 from sklearn.metrics import mean_squared_error
 from sklearn.metrics import mean_absolute_error
-from sklearn.impute import SimpleImputer
-from sklearn.model_selection import GridSearchCV
-from sklearn.model_selection import RandomizedSearchCV
-from sklearn.model_selection import train_test_split
+# from sklearn.impute import SimpleImputer
+# from sklearn.model_selection import GridSearchCV
+# from sklearn.model_selection import RandomizedSearchCV
+# from sklearn.model_selection import train_test_split
+
+from sklearn.multioutput import MultiOutputRegressor
 
 from utils import ios
 from utils import viz
 from utils import system
-from utils import predictions as utils
+from utils import validations
+# from utils import predictions as utils
 
 ################################################################################
 # Constants
@@ -36,45 +42,307 @@ from utils.constants import *
 ################################################################################
 class SESMetadata(object):
 
-    def __init__(self, traintype, output_folder=None, random_state=None):
-      #self.df_data = None
+    def __init__(self, path, traintype='all', features_source='all', timevar=False, runid=1, cv=5, fold=1, include_fmaps=False, random_state=None):      
+      self.path = path
       self.ttype = traintype
+      self.features_source = features_source
+      self.timevar = timevar
+      self.runid = runid
+      self.cv = cv
+      self.fold = fold
+      self.include_fmaps = include_fmaps
       self.random_state = np.random.default_rng().integers(999999999) if random_state is None else int(random_state)
-      self.output_folder = output_folder
-      self.pplaces = traintype in NONE
+      
+      self.df_tuning = None
+      self.df_best = None
+
+      if self.path:
+        self.output_folder = os.path.join(self.path, f'xgb-{self.features_source}{f"-{self.timevar}" if self.timevar is not None else ""}')
+        ios.validate_path(self.output_folder)
+
+      # if not self.pplaces:
+      validations.validate_traintype(self.ttype)
+      np.random.seed(self.random_state)
+  
+    ############################################################################
+    # HYPER-PARAM TUNING: TRAIN + VAL
+    ############################################################################
+    
+    def tuning(self, X_train, y_train, X_val, y_val, feature_names, njobs=1):
+      ### get pending combinations
+      df_tuning = self.load_tuning_file()
+      
+      tmp = df_tuning.query(f"loss_fold{self.fold} in @NONE")
+      if tmp.shape[0]==0:
+        return # all done
+
+      print('Train:', X_train.shape, y_train.shape, len(feature_names))
+      print('Val:', X_val.shape, y_val.shape)
+
+      for i,row in tqdm(tmp.iterrows(), total=tmp.shape[0]):
+        params = json.loads(row.params.replace("'",'"'))
+
+        # fit
+        start = time.time()
+        model = MultiOutputRegressor(xgb.XGBRegressor(objective=params['objective'], 
+                                                      eval_metric=params['eval_metric'],
+                                                      n_estimators=params['n_estimators'],
+                                                      max_depth=params['max_depth'],
+                                                      learning_rate=params['learning_rate'],
+                                                      booster=params['booster'],
+                                                      gamma=params['gamma'],
+                                                      min_child_weight=params['min_child_weight'],
+                                                      max_delta_step=params['max_delta_step'],
+                                                      subsample=params['subsample'],
+                                                      colsample_bytree=params['colsample_bytree'],
+                                                      colsample_bylevel=params['colsample_bylevel'],
+                                                      colsample_bynode=params['colsample_bynode'],
+                                                      reg_lambda=params['reg_lambda'],
+                                                      reg_alpha=params['reg_alpha'],
+                                                      gpu_id=params['gpu_id'],
+                                                      tree_method=params['tree_method'],
+                                                      random_state=params['random_state']), n_jobs=njobs)
+        #model = model.fit(X_train, y_train, verbose=False) # eval_set=[(X_val, y_val)]
+        model.fit(X_train, y_train, verbose=False)
+        fit_time = time.time() - start
+
+        #eval
+        start = time.time()
+        y_pred = model.predict(X_val) # why there can be nans?
+        if np.isnan(y_pred).sum() > 0:
+          print("[WARNING] NANs in prediction")
+          y_pred = np.nan_to_num(y_pred, nan=-100)
+          print(y_pred)
+        mse = mean_squared_error(y_val, y_pred)
+        eval_time = time.time() - start
+
+        # update
+        self.update_tuning(df_tuning, i, mse, fit_time, eval_time)
+        
+    def get_all_hparams(self):
+      hparams = {'objective':['reg:squarederror'],
+                'eval_metric':["rmse"],
+                'n_estimators': [50,100,200,300,500],
+                'max_depth': [3,4,5,6,7,8,9,10,12,15],
+                'learning_rate': [0.01,0.05,0.1,0.15,0.2,0.25,0.3], #learning rate
+                'booster': ['gbtree','dart'],
+                'gamma': [0,0.1,0.3,0.5,1.0,2.0,3.0], #min_split_loss
+                'min_child_weight':[0,1,3,5,7,10],
+                'max_delta_step': [1,2,3,4,5,6,7,8,9,10],
+                'subsample': [0.5,1],
+                'colsample_bytree': [0.3,0.4,0.5,0.6,0.7,0.8,0.9,0.95],
+                'colsample_bylevel': [0.3,0.4,0.5,0.6,0.7,0.8,0.9,0.95],
+                'colsample_bynode': [0.3,0.4,0.5,0.6,0.7,0.8,0.9,0.95],
+                'reg_lambda': [0,1,1.5,2,2.5,3,3.5], # L2 reg
+                'reg_alpha': [0,1,1.5,2,2.5,3,3.5], # L1 reg 
+                'gpu_id':[0],
+                'tree_method':['gpu_hist'],
+                'random_state':[int(self.random_state)]}
+
+      combinations = np.prod([len(v) for v in hparams.values()])
+      print("- All possible combinations hyper-params: ", combinations)
+      n_iter = min(CNN_TUNING_ITER,int(round(combinations/2)))
+      print("- # random candidates: ", n_iter)
+      return hparams, n_iter, combinations
+
+    def get_tuning_fn(self):
+      fn = os.path.join(self.output_folder, 'tuning.csv')
+      os.makedirs(os.path.dirname(fn), exist_ok=True)
+      return fn
+
+    def load_tuning_file(self):
+      fn = self.get_tuning_fn()
+      if ios.exists(fn):
+        df = ios.load_csv(fn)
+      else:
+        # hparams
+        hparams, n_iter, combinations = self.get_all_hparams()
+        # populate
+        cols = ['rs','runid','mean_fit_time','std_fit_time','mean_eval_time','std_eval_time','params']
+        cols.extend([f'param_{k}' for k,v in hparams.items()])
+        cols.extend([f'loss_fold{k}' for k in np.arange(1, self.cv+1, 1)])
+        cols.extend(['mean_loss','std_loss','rank'])
+        df = pd.DataFrame(columns=cols)
+        strhp = ['objective','eval_metric','booster','tree_method']
+        
+        while True:
+          if df.shape[0] == n_iter:
+            break
+          hp = SESMetadata.get_random_hyper_params_combination(hparams)
+          q = " and ".join([f"param_{k}=='{v}'" if k in strhp else f"param_{k}=={v}" for k,v in hp.items()])
+          if df.query(q).shape[0] == 0:
+            obj = {f'param_{k}':f'{v}' if k in strhp else v for k,v in hp.items()}
+            obj.update({"rs":self.random_state})
+            obj.update({"runid":self.runid})
+            obj.update({"params":str(hp)})
+            df = df.append(pd.DataFrame(obj, index=[0], columns=cols), ignore_index=True)
+        ios.save_csv(df, fn)  
+      return df
+
+    @staticmethod
+    def get_random_hyper_params_combination(hparams):
+        hp = {}
+        for k,v in hparams.items():
+          hp[k] = np.random.choice(v)
+        return hp
+
+    @staticmethod
+    def get_fmaps(path, setname, fmap_layer_id=None, fold=None):
+      try:
+        postfix = f"_{fold}" if fold is not None else ""
+        path = os.path.join(path,f"layer-{fmap_layer_id}") if fmap_layer_id is not None else path
+
+        fn = os.path.join(path,f'fmap_{setname}{postfix}.npz')
+        print(f"{fn} loading...")
+        fmap = ios.load_array(fn)['arr_0']
+      except Exception as ex:
+        print(ex)
+        fmap = None
+      return fmap
+      
+    def update_tuning(self, df, index, mse, fit_time, eval_time):
+      df.loc[index,f'loss_fold{self.fold}'] = mse
+      df.loc[index,'mean_fit_time'] = f"{df.loc[index,'mean_fit_time']},{fit_time}" if df.loc[index,'mean_fit_time'] not in NONE else f"{fit_time}"
+      df.loc[index,'mean_eval_time'] = f"{df.loc[index,'mean_eval_time']},{eval_time}" if df.loc[index,'mean_eval_time'] not in NONE else f"{eval_time}"
+      ios.save_csv(df, self.get_tuning_fn(), verbose=False)
+
+    def sumarize_tuning(self, df):
+      if df.mean_loss.isnull().values.any():
+        loss_cols = [c for c in df.columns if c.startswith('loss_fold')]
+        df.loc[:,'mean_loss'] = df.apply(lambda row: np.mean([row[c] for c in loss_cols]), axis=1)
+        df.loc[:,'std_loss'] = df.apply(lambda row: np.std([row[c] for c in loss_cols]), axis=1)
+        df.loc[:,'rank'] = df.mean_loss.rank(na_option='bottom',ascending=True,pct=False)
+        df.loc[:,'std_fit_time'] = df.mean_fit_time.apply(lambda c: np.std([float(t) for t in c.split(',') if t not in NONE]))
+        df.loc[:,'mean_fit_time'] = df.mean_fit_time.apply(lambda c: np.mean([float(t) for t in c.split(',') if t not in NONE]))
+        df.loc[:,'std_eval_time'] = df.mean_eval_time.apply(lambda c: np.std([float(t) for t in c.split(',') if t not in NONE]))
+        df.loc[:,'mean_eval_time'] = df.mean_eval_time.apply(lambda c: np.mean([float(t) for t in c.split(',') if t not in NONE]))
+        ios.save_csv(df, self.get_tuning_fn(), verbose=False)
+
+    ############################################################################
+    # EVALUATION: TRAIN + TEST
+    ############################################################################
+
+    def oos_evaluation(self, X_train, y_train, X_test, y_test, feature_names):
+      # summary
+      fn = self.get_tuning_fn()
+      df_tuning = ios.load_csv(fn)
+      if df_tuning.mean_loss.isnull().values.any():
+        self.sumarize_tuning(df_tuning)
+
+      # best
+      self.df_best = df_tuning.query("rank==1").iloc[0]
+      params = json.loads(self.df_best.params.replace("'",'"'))
+      print(params)
+
+      # model
+      model = MultiOutputRegressor(xgb.XGBRegressor(objective=params['objective'], 
+                                                    eval_metric=params['eval_metric'],
+                                                    n_estimators=params['n_estimators'],
+                                                    max_depth=params['max_depth'],
+                                                    learning_rate=params['learning_rate'],
+                                                    booster=params['booster'],
+                                                    gamma=params['gamma'],
+                                                    min_child_weight=params['min_child_weight'],
+                                                    max_delta_step=params['max_delta_step'],
+                                                    subsample=params['subsample'],
+                                                    colsample_bytree=params['colsample_bytree'],
+                                                    colsample_bylevel=params['colsample_bylevel'],
+                                                    colsample_bynode=params['colsample_bynode'],
+                                                    reg_lambda=params['reg_lambda'],
+                                                    reg_alpha=params['reg_alpha'],
+                                                    gpu_id=params['gpu_id'],
+                                                    tree_method=params['tree_method'],
+                                                    random_state=params['random_state']
+                                                    )).fit(X_train, y_train, verbose=False)
+      
+      # save model
+      fn = os.path.join(self.output_folder, 'model.h5')
+      ios.save_h5(model, fn)
+
+      # predict
+      y_pred = model.predict(X_test) 
+      return y_pred
+
+    def get_evaluation_fn(self):
+      return os.path.join(self.output_folder, 'evaluation.json')
+    
+    def save_evaluation(self, y_true, y_pred):
+      self.metrics = {'mae':None, 'mse':None, 'rmse':None, 'r2':None, 
+                  'mae_mean':None, 'mse_mean':None, 'rmse_mean':None, 'r2_mean':None, 
+                  'mae_std':None, 'mse_std':None, 'rmse_std':None, 'r2_std':None, 
+                  'corr_true':(None,None), 'corr_pred':(None,None)}
+
+      # overall
+      mae = mean_squared_error(y_true, y_pred)
+      rmse = mean_squared_error(y_true, y_pred, squared=False)
+      mse = mean_squared_error(y_true, y_pred, squared=True)
+      r2 = r2_score(y_true, y_pred)
+      self.metrics['mae'] = mae
+      self.metrics['mse'] = mse
+      self.metrics['rmse'] = rmse
+      self.metrics['r2'] = r2
+
+      # For each output variable
+      for i,name in enumerate(['mean','std']):
+        yt = y_true[:,i]
+        yp = y_pred[:,i]
+        mae = mean_squared_error(yt, yp)
+        rmse = mean_squared_error(yt, yp, squared=False)
+        mse = mean_squared_error(yt, yp, squared=True)
+        r2 = r2_score(yt, yp)
+        self.metrics[f'mae_{name}'] = mae
+        self.metrics[f'mse_{name}'] = mse
+        self.metrics[f'rmse_{name}'] = rmse
+        self.metrics[f'r2_{name}'] = r2
+        
+      self.metrics['corr_true'] = pearsonr(y_true[:,0],y_true[:,1])
+      self.metrics['corr_pred'] = pearsonr(y_pred[:,0],y_pred[:,1])
+
+      fn = self.get_evaluation_fn() #os.path.join(self.output_folder, 'evaluation.json')
+      ios.save_json(self.metrics, fn)
+
+    def plot_evaluation(self, y_true, y_pred):
+      fn = os.path.join(self.output_folder, 'plot_pred_true.png')
+      viz.plot_pred_true(y_pred, y_true, {k:v for k,v in self.metrics.items() if "_" not in k}, fn=fn)
+
+    def load_evaluation(self):
+      fn = self.get_evaluation_fn()
+      return ios.load_json(fn)
+      
+    ############################################################################
+    # EVALUATION: TRAIN + TEST
+    ############################################################################
+    
+    def save_predictions(self, test, y_test, y_pred, y_attributes):
+      fn = os.path.join(self.output_folder, 'test_pred_xgb.csv')
+      df = test.loc[:,['cluster_id']]
+      for ia, at in enumerate(y_attributes):
+        df.loc[:,f'true_{at}'] = y_test[:,ia]
+        df.loc[:,f'pred_{at}'] = y_pred[:,ia]
+      ios.save_csv(df, fn)
+      
+      #self.df_data = None
       #self.xgb_model = None
       #self.xgb_best_params = None
       #self.xgb_model = None
-      self.feature_importance = None
-      self.cv_results = None
-      self.best_params = None
-      self.best_score = None
-      self.df_evaluation = None
-      self.X = {'train':None, 'val':None, 'test':None}
-      self.y_true = {'train':None, 'val':None, 'test':None}
-      self.y_pred = {'train':None, 'val':None, 'test':None}
-      self.evaluation_metric = {'train':{'mae':None, 'rmse':None, 'r2':None},
-                                'val':{'mae':None, 'rmse':None, 'r2':None},
-                                'test':{'mae':None, 'rmse':None, 'r2':None}}
+      # self.pplaces = traintype in NONE
+      # self.cv_results = None
+      # self.best_params = None
+      # self.best_score = None
+      # self.df_evaluation = None
+      # self.feature_importance = None
+      # self.X = {'train':None, 'val':None, 'test':None}
+      # self.y_true = {'train':None, 'val':None, 'test':None}
+      # self.y_pred = {'train':None, 'val':None, 'test':None}
 
-      if self.output_folder:
-        ios.validate_path(self.output_folder)
+    # def set_data(self, X_train, y_train, X_val, y_val, X_test, y_test):
+    #   self.X['train'] = X_train
+    #   self.X['val'] = X_val
+    #   self.X['test'] = X_test
+    #   self.y_true['train'] = y_train 
+    #   self.y_true['val'] = y_val
+    #   self.y_true['test'] = y_test
 
-      if not self.pplaces:
-        if self.ttype not in [TTYPE_ALL, TTYPE_PAST, TTYPE_FORMER, TTYPE_RECENT]:
-          raise Exception("trainig type not found.")
-
-      np.random.seed(self.random_state)
-
-    def set_data(self, X_train, y_train, X_val, y_val, X_test, y_test):
-      self.X['train'] = X_train
-      self.X['val'] = X_val
-      self.X['test'] = X_test
-      self.y_true['train'] = y_train 
-      self.y_true['val'] = y_val
-      self.y_true['test'] = y_test
-
-  
     # def hyper_parameter_tuning(self, cv, njobs, gpu, verbose, tuning):
     #   if tuning == 'robust':
     #     param_tuning = {

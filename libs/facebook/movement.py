@@ -1,3 +1,10 @@
+import warnings
+warnings.simplefilter(action='ignore', category=UserWarning)
+
+###############################################################################
+# Dependencies
+###############################################################################
+
 import os
 import gc
 import zipfile
@@ -10,6 +17,16 @@ from joblib import Parallel
 from functools import partial
 from sklearn.cluster import DBSCAN
 from scipy.sparse import csr_matrix
+from fast_pagerank import pagerank
+
+from maps import geo
+from utils import validations
+
+###############################################################################
+# Constants
+###############################################################################
+
+from utils.constants import *
 
 ###############################################################
 # Class
@@ -56,7 +73,8 @@ class FacebookMovement(object):
     # 2.2 unique length_km for each edge
     edges = self.gdf_data[['start','end','dow','time','n_baseline','length_km']]
     edges = edges.groupby(['start','end','dow','time']).agg({'length_km':lambda x:x.unique(),
-                                                             'n_baseline':lambda x: 1.0 if x.nunique() == 1 and x.unique().min() == 1.0 else x[x>1].mode()[0] if x.mode()[0]==1.0 else x.mode()[0]}).reset_index()
+                                                             'n_baseline':lambda x: 1.0 if x.nunique() == 1 and x.unique().min() == 1.0 else 
+                                                             x[x>1].mode()[0] if x.mode()[0]==1.0 else x.mode()[0]}).reset_index()
     edges = edges.groupby(['start','end']).agg({'length_km':lambda x:x.unique(),
                                                 'n_baseline':'sum'}).reset_index()
     edges.rename(columns={'start':'source', 'end':'target', 'n_baseline':'weight', 'length_km':'distance'}, inplace=True)
@@ -75,6 +93,83 @@ class FacebookMovement(object):
     self.A = csr_matrix((np.ones(self.M.count_nonzero()), (source_index.ravel(), target_index.ravel())), shape=(n, n))  # number of places
     self.D = csr_matrix((distances.ravel(), (source_index.ravel(), target_index.ravel())), shape=(n, n))                 # average traversed distance
 
+  def get_features(self, df):
+    ### 0. lon,lat columns
+    #id,lon,lat = ("DHSID","LONGNUM","LATNUM") if 'LATNUM' in df.columns else ('OSMID','lon','lat')
+    id = validations.get_column_id(df)
+    lon,lat = LON,LAT
+
+    ### 1. geometry lon,lat from survey
+    gdf = gpd.GeoDataFrame(df[[id,lon,lat]], geometry=gpd.points_from_xy(df[lon], df[lat]), crs=geo.PROJ_DEG)
+
+    ### 2. geometry lon,lat places from movement data
+    gdf_tiles = gpd.GeoDataFrame()
+    gdf_tiles.loc[:,'geometry'] = gpd.GeoSeries.from_wkt(self.nodes, crs=geo.PROJ_DEG)
+    gdf_tiles.loc[:,'nodeid'] = np.arange(0,gdf_tiles.shape[0])
+
+    ### 3. Projection to meters
+    gdf_tiles_proj = geo.get_projection(gdf_tiles, geo.PROJ_MET)
+    gdf_proj = geo.get_projection(gdf, geo.PROJ_MET)
+    del(gdf)
+    del(gdf_tiles)
+    gc.collect()
+
+    ### 4. closest tile per cluster
+    gdf_nearest, dist = geo.fast_find_nearest_per_record(gdf_proj, gdf_tiles_proj)
+    gdf_nearest.loc[:,id] = gdf_proj.loc[:,id]
+    del(gdf_proj)
+    del(gdf_tiles_proj)
+    gc.collect()
+
+    ### 5. Features:
+    # F1. out-degree: distinct places -->
+    O = self.A.sum(axis=1).A.ravel()
+
+    # F2. in-degree: distinct places <--
+    I = self.A.sum(axis=0).A.ravel()
+
+    # F3. weighted out-degree: (flow) number of people -->
+    FO = self.M.sum(axis=1).A.ravel() # row
+
+    # F4. weighted in-degree: (flow) number of people <--
+    FI = self.M.sum(axis=0).A.ravel() # col
+
+    # F5. average distance OUT
+    DO = self.D.mean(axis=1).A.ravel()
+
+    # F6. averange distance IN
+    DI = self.D.mean(axis=0).A.ravel()
+
+    # F7. weighted pagerank
+    WPR = pagerank(self.M, p=0.85)
+
+    # F8. pagerank
+    PR = pagerank(self.A, p=0.85)
+
+    ### 6. adding features to final df
+    # raw numbers:
+    gdf_nearest.loc[:, 'FBMV_OUTdeg'] = gdf_nearest.nodeid.apply(lambda c: O[c])
+    gdf_nearest.loc[:, 'FBMV_INdeg'] = gdf_nearest.nodeid.apply(lambda c: I[c])
+    gdf_nearest.loc[:, 'FBMV_fOUTdeg'] = gdf_nearest.nodeid.apply(lambda c: FO[c])
+    gdf_nearest.loc[:, 'FBMV_fINdeg'] = gdf_nearest.nodeid.apply(lambda c: FI[c])
+    gdf_nearest.loc[:, 'FBMV_dOUTdeg'] = gdf_nearest.nodeid.apply(lambda c: DO[c])
+    gdf_nearest.loc[:, 'FBMV_dINdeg'] = gdf_nearest.nodeid.apply(lambda c: DI[c])
+    gdf_nearest.loc[:, 'FBMV_WPR'] = gdf_nearest.nodeid.apply(lambda c: WPR[c])
+    gdf_nearest.loc[:, 'FBMV_PR'] = gdf_nearest.nodeid.apply(lambda c: PR[c])
+    gdf_nearest.loc[:, 'FBMV_dist'] = dist
+
+    # gravitational: divided by distance to closest tile
+    for exponent in [1,1.5,2]:
+      gdf_nearest.loc[:, 'FBMV_OUTdeg_grav_{}'.format(exponent)] = gdf_nearest.apply(lambda row: row.FBMV_OUTdeg / (row.FBMV_dist ** exponent), axis=1)
+      gdf_nearest.loc[:, 'FBMV_INdeg_grav_{}'.format(exponent)] = gdf_nearest.apply(lambda row: row.FBMV_INdeg / (row.FBMV_dist ** exponent), axis=1)
+      gdf_nearest.loc[:, 'FBMV_fOUTdeg_grav_{}'.format(exponent)] = gdf_nearest.apply(lambda row: row.FBMV_fOUTdeg / (row.FBMV_dist ** exponent), axis=1)
+      gdf_nearest.loc[:, 'FBMV_fINdeg_grav_{}'.format(exponent)] = gdf_nearest.apply(lambda row: row.FBMV_fINdeg /(row.FBMV_dist ** exponent), axis=1)
+      gdf_nearest.loc[:, 'FBMV_WPR_grav_{}'.format(exponent)] = gdf_nearest.apply(lambda row: row.FBMV_WPR / (row.FBMV_dist ** exponent), axis=1)
+      gdf_nearest.loc[:, 'FBMV_PR_grav_{}'.format(exponent)] = gdf_nearest.apply(lambda row: row.FBMV_PR / (row.FBMV_dist ** exponent), axis=1)
+
+    gdf_nearest = validations.delete_nonprojected_variables(gdf_nearest, os.path.basename(__file__), True)
+    return gdf_nearest
+  
 ###############################################################
 # Functions
 ###############################################################
@@ -103,11 +198,16 @@ def load_files_from_zip(fn, togeopandas=False):
           if not os.path.isdir(filename):
             with z.open(filename, mode='r') as f:
               tmp = pd.read_csv(f)
+              
+              if 'GEOMETRY' in tmp:
+                tmp.rename(columns={'GEOMETRY':'geometry'}, inplace=True)
+                
               # if tmp.query("not geometry.str.startswith('LINE')", engine='python').shape[0] > 0:
               #   ### when no escaping (then correct geometry)
               #   for index,row in tmp.iterrows():
               #     tmp.loc[index,'geometry'] = '{},{}'.format(index,row.geometry)
               #   tmp.reset_index(drop=True, inplace=True)
+              
               df = df.append(tmp, ignore_index=True)
     
     # disentangle date/time (faster to handle)
@@ -117,7 +217,7 @@ def load_files_from_zip(fn, togeopandas=False):
     df.loc[:,'time'] = df.date_time.apply(lambda c: c.split(" ")[1])
     df.loc[:,'dow'] = pd.to_datetime(df.loc[:,'date']).dt.day_name()
 
-    # disentangle start and end from geometry
+    # disentangle start and end from geometry  
     df.loc[:,'start'] = df.geometry.apply(lambda c: None if 'LINE' not in c else "POINT ({})".format(  " ".join([str(round(float(f),5)) for f in c.split(", ")[0].replace("LINESTRING (","").split(' ')]) )) #lon,lat
     df.loc[:,'end'] = df.geometry.apply(lambda c: None if 'LINE' not in c else "POINT ({})".format( " ".join([str(round(float(f),5)) for f in c.split(", ")[1].replace(")","").split(" ")]) )) #lon,lat
 
@@ -129,7 +229,7 @@ def load_files_from_zip(fn, togeopandas=False):
       df['geo_end'] = gpd.GeoSeries.from_wkt(df['end'])
 
   except Exception as ex:
-    print(ex)
+    print(f"[ERROR] movement.py | load_files_from_zip | {ex} | fn:{fn}")
     df = None
   return df
 

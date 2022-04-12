@@ -34,17 +34,25 @@ from shapely.geometry import MultiLineString
 from OSMPythonTools.nominatim import Nominatim
 from OSMPythonTools.overpass import overpassQueryBuilder
 from OSMPythonTools.overpass import Overpass
-
+from OSMPythonTools.cachingStrategy import CachingStrategy, JSON
+  
 from utils import ios
-from ses.data import delete_nonprojected_variables
+from utils.validations import delete_nonprojected_variables
 
 #############################################################################
 # Constants
 #############################################################################
 
-from maps.geo import PROJ_DEG
-from maps.geo import PROJ_MET 
-from maps.geo import MILE_TO_M
+from utils.constants import PROJ_DEG
+from utils.constants import PROJ_MET 
+from utils.constants import MILE_TO_M
+from utils.constants import NO
+from utils.constants import NONE
+from utils.constants import PPLACE_RURAL_BY_TYPE
+from utils.constants import LAT
+from utils.constants import LON
+from utils.constants import RURAL
+from utils.constants import OSMID
 
 OSMPT_MIN_WAIT = 1
 OSMPT_WAIT_BETWEEN_QUERIES_MAX = 5
@@ -55,12 +63,11 @@ ZOOM_POIS = 18
 SLEEP = 10
 MAX_TRIES = 10
 
-TAGS = {
-        'place':['city','town','village','hamlet','isolated_dwelling'],
+TAGS = {'place':['city','town','village','hamlet','isolated_dwelling'],
         'highway':['primary', 'primary_link', 'secondary', 'secondary_link', 'tertiary', 'tertiary_link', 'trunk', 'trunk_link', 'motorway'],
         'amenity':['bar','cafe','fast_food','pub','college','kindergarten','library','school','university','bus_station','atm','bank','clinic','dentist','hospital','pharmacy','veterinari','cinema','community_centre','courthouse','embassy','marketplace','police','townhall']
        }
-PPL_COLS = ['OSMID','lat','lon','loc_name', 'name', 'type','place', 'population','capital','is_capital','admin_level','GNS:dsg_code']
+PPL_COLS = [OSMID,LAT,LON,RURAL,'place','loc_name', 'name', 'type', 'population','capital','is_capital','admin_level','GNS:dsg_code']
 FEAT_COLS = ['id','total_length_roads','distance_closest_road','num_junctions','distance_closest_junction', 'total_building_area', 'num_buildings'] #lat,lon
 
 for t in TAGS['amenity']:
@@ -81,7 +88,7 @@ class OSM(object):
     self.pois = []
     self.bbox = []
 
-  def get_populated_places_by_country(self, country, fn, overwrite=False, cache_dir='/mydrive/cache'):
+  def get_populated_places_by_country(self, country, fn, load=False, cache_dir='/mydrive/cache'):
     '''
     Loads into self.ppl all populated places found in a country using OSM.
     Such places must be of any tag within TAGS['place'].
@@ -92,13 +99,14 @@ class OSM(object):
     @return 
     '''
 
-    ### if exists and overwrite False, load
-    if os.path.exists(fn) and not overwrite:
+    ### if exists and load, then load
+    if os.path.exists(fn) and load:
       self.ppl = ios.load_csv(fn, index_col=0)
       return
 
     ### osm area id
-    nominatim = Nominatim(cacheDir=cache_dir)
+    CachingStrategy.use(JSON, cacheDir=cache_dir)
+    nominatim = Nominatim()
     area_id = nominatim.query(country).areaId()
 
     ### query
@@ -106,7 +114,8 @@ class OSM(object):
     tags = '|'.join(TAGS[kind])
     selector = "'{}'~'{}'".format(kind,tags)
     wait = np.random.randint(OSMPT_MIN_WAIT,OSMPT_WAIT_BETWEEN_QUERIES_MAX+1)
-    overpass = Overpass(cacheDir=cache_dir, waitBetweenQueries=wait)
+    CachingStrategy.use(JSON, cacheDir=cache_dir)
+    overpass = Overpass(waitBetweenQueries=wait)
     query = overpassQueryBuilder(area=area_id, elementType='node', selector=selector, out='body')
     
     ### retrieve data
@@ -114,10 +123,11 @@ class OSM(object):
     results = overpass.query(query, timeout=OSMPT_TIMEOUT).toJSON()['elements']
     for r in tqdm(results):
       obj = r['tags']
-      obj['OSMID'] = r['id']
-      obj['lat'] = r['lat']
-      obj['lon'] = r['lon']
+      obj[OSMID] = r['id']
+      obj[LAT] = r['lat']
+      obj[LON] = r['lon']
       obj['type'] = r['type']
+      obj[RURAL] = int(r['tags']['place'] in PPLACE_RURAL_BY_TYPE)
       self.ppl = self.ppl.append(pd.DataFrame(obj, index=[0], columns=PPL_COLS), ignore_index=True)
 
     ### save
@@ -125,14 +135,15 @@ class OSM(object):
       ios.save_csv(self.ppl[PPL_COLS], fn)
 
   def get_populated_places_id_lat_lon(self):
-    return self.ppl[['OSMID','lat','lon']].to_numpy()
+    return self.ppl[[OSMID,LAT,LON]].to_numpy()
 
-  def get_features(self, places, fn=None, overwrite=False, cache_dir='/mydrive/cache'):
+  def get_features(self, places, width=MILE_TO_M, fn=None, overwrite=False, cache_dir='/mydrive/cache'):
     '''
     Loads into self.features all features found within each place in places.
     Such places must be of the form (id, lat, lon).
     
     @param places: tuple (id, lat, lon)
+    @param width: width (and thus height) of the bounding box
     @param fn: file path where to store dataframe
     @param cache_dir: directory where to cache OSM data
     @return 
@@ -144,17 +155,19 @@ class OSM(object):
       print('loaded')
       return
 
+    if width in NO or width in NONE:
+      width = MILE_TO_M
+    print(f"Using bounding-box width: {width}")
+    
     self.features = pd.DataFrame(columns=FEAT_COLS)
     for id,lat,lon in tqdm(places, total=len(places)):
       
-      roads, junctions, d1, d2, d3, d4 = OSM.get_road_features(lat, lon, cache_dir)
-      buildings, d5, d6 = OSM.get_building_features(lat, lon, cache_dir)
-      pois, pois_summary = OSM.get_poi_features(lat, lon, cache_dir)
+      roads, junctions, d1, d2, d3, d4 = OSM.get_road_features(lat, lon, width, cache_dir)
+      buildings, d5, d6 = OSM.get_building_features(lat, lon, width, cache_dir)
+      pois, pois_summary = OSM.get_poi_features(lat, lon, width, cache_dir)
 
       obj = {}
-      obj['id'] = id # int(id)
-      #obj['lat'] = lat
-      #obj['lon'] = lon
+      obj['id'] = id
       obj['total_length_roads'] = d1
       obj['distance_closest_road'] = d2
       obj['num_junctions'] = d3
@@ -187,7 +200,8 @@ class OSM(object):
 
     while tries <= MAX_TRIES:
       try:
-        nominatim = Nominatim(cacheDir=cache_dir)
+        CachingStrategy.use(JSON, cacheDir=cache_dir)
+        nominatim = Nominatim()
         q = nominatim.query(lat, lon, reverse=reverse, zoom=zoom).toJSON()
         return q
       except Exception as exception:
@@ -207,7 +221,8 @@ class OSM(object):
     while tries <= MAX_TRIES:
       try:
         wait = np.random.randint(1,OSMPT_WAIT_BETWEEN_QUERIES_MAX+1)
-        overpass = Overpass(cacheDir=cache_dir, waitBetweenQueries=wait)
+        CachingStrategy.use(JSON, cacheDir=cache_dir)
+        overpass = Overpass(waitBetweenQueries=wait)
         query = overpassQueryBuilder(bbox=bbox, elementType=elementType, selector=selector, out=out, includeGeometry=includeGeometry)
         results = overpass.query(query, timeout=OSMPT_TIMEOUT).toJSON()['elements']
         return results
@@ -221,36 +236,15 @@ class OSM(object):
     return None
 
   @staticmethod
-  def get_road_features(lat, lon, cache_dir='/mydrive/cache'):
+  def get_road_features(lat, lon, width=MILE_TO_M, cache_dir='/mydrive/cache'):
     ### osm area id
-    # q = OSM.query_nominatim(lat=lat, lon=lon, reverse=True, zoom=ZOOM_MAJOR_AND_MINOR_STREETS, cacheDir=cache_dir)
-    # # nominatim = Nominatim(cacheDir=cache_dir)
-    # # q = nominatim.query(lat, lon, reverse=True, zoom=ZOOM_MAJOR_AND_MINOR_STREETS).toJSON()
-    
-    # if len(q) > 1:
-    #   print(len(q))
-    #   print(q)
-    #   raise Exception("Should this happen?")
-
-    # #info = q[0]
-    # #bbox = info['boundingbox']
-    # #bbox = [float(bbox[0]),float(bbox[2]),float(bbox[1]),float(bbox[3])]
-    bbox = OSM.get_one_mile_bbox(lat, lon)
+    bbox = OSM.get_bbox_by_width(lat, lon, width)
     
     ### query results
     kind = 'highway'
     tags = '|'.join(TAGS[kind])
     selector = "'{}'~'{}'".format(kind,tags)
     results = OSM.get_query_builder_results(bbox=bbox, selector=selector, elementType='way', out='body', includeGeometry='True', cache_dir=cache_dir)
-
-    # tags = '|'.join(TAGS[kind])
-    # selector = "'{}'~'{}'".format(kind,tags)
-    # wait = np.random.randint(1,OSMPT_WAIT_BETWEEN_QUERIES_MAX+1)
-    # overpass = Overpass(cacheDir=cache_dir, waitBetweenQueries=wait)
-    # query = overpassQueryBuilder(bbox=bbox, elementType='way', selector=selector, out='body', includeGeometry=True)
-
-    # ### retrieve data
-    # results = overpass.query(query, timeout=OSMPT_TIMEOUT).toJSON()['elements']
 
     ### length of road
     roads = defaultdict(list)
@@ -275,35 +269,14 @@ class OSM(object):
     return roads, junctions, d1, d2, d3, d4
 
   @staticmethod
-  def get_building_features(lat, lon, cache_dir='/mydrive/cache'):
+  def get_building_features(lat, lon, width=MILE_TO_M, cache_dir='/mydrive/cache'):
     ### osm area id
-    # q = OSM.query_nominatim(lat=lat, lon=lon, reverse=True, zoom=ZOOM_BUILDINGS, cacheDir=cache_dir)
-    # # nominatim = Nominatim(cacheDir=cache_dir)
-    # # q = nominatim.query(lat, lon, reverse=True, zoom=ZOOM_BUILDINGS).toJSON()
-    
-    # if len(q) > 1:
-    #   print(len(q))
-    #   print(q)
-    #   raise Exception("Should this happen?")
-
-    # #info = q[0]
-    # #bbox = info['boundingbox']
-    # #bbox = [float(bbox[0]),float(bbox[2]),float(bbox[1]),float(bbox[3])]
-    bbox = OSM.get_one_mile_bbox(lat, lon)
+    bbox = OSM.get_bbox_by_width(lat, lon, width)
 
     ### query
     kind = 'building'
     selector = "'{}'='yes'".format(kind)
     results = OSM.get_query_builder_results(bbox=bbox, selector=selector, elementType='way', out='body', includeGeometry='True', cache_dir=cache_dir)
-
-    # kind = 'building'
-    # selector = "'{}'='yes'".format(kind)
-    # wait = np.random.randint(1,OSMPT_WAIT_BETWEEN_QUERIES_MAX+1)
-    # overpass = Overpass(cacheDir=cache_dir, waitBetweenQueries=wait)
-    # query = overpassQueryBuilder(bbox=bbox, elementType='way', selector=selector, out='body', includeGeometry=True)
-
-    ### retrieve data
-    # results = overpass.query(query, timeout=OSMPT_TIMEOUT).toJSON()['elements']
 
     buildings = []
     d5 = 0
@@ -317,35 +290,15 @@ class OSM(object):
     return buildings, d5, d6
 
   @staticmethod
-  def get_poi_features(lat, lon, cache_dir='/mydrive/cache'):
+  def get_poi_features(lat, lon, width=MILE_TO_M, cache_dir='/mydrive/cache'):
     ### osm area id
-    # q = OSM.query_nominatim(lat=lat, lon=lon, reverse=True, zoom=ZOOM_POIS, cacheDir=cache_dir)
-    # # nominatim = Nominatim(cacheDir=cache_dir)
-    # # q = nominatim.query(lat, lon, reverse=True, zoom=ZOOM_POIS).toJSON()
-    
-    # if len(q) > 1:
-    #   print(len(q))
-    #   print(q)
-    #   raise Exception("Should this happen?")
-
-    # #info = q[0]
-    # #bbox = info['boundingbox']
-    # #bbox = [float(bbox[0]),float(bbox[2]),float(bbox[1]),float(bbox[3])]
-    bbox = OSM.get_one_mile_bbox(lat, lon)
+    bbox = OSM.get_bbox_by_width(lat, lon, width)
 
     ### query
     kind = 'amenity'
     tags = '|'.join(TAGS[kind])
     selector = "'{}'~'{}'".format(kind,tags)
     results = OSM.get_query_builder_results(bbox=bbox, selector=selector, elementType='node', out='body', includeGeometry='True', cache_dir=cache_dir)
-
-    # wait = np.random.randint(1,OSMPT_WAIT_BETWEEN_QUERIES_MAX+1)
-    # overpass = Overpass(cacheDir=cache_dir, waitBetweenQueries=wait)
-    # query = overpassQueryBuilder(bbox=bbox, elementType='node', selector=selector, out='body', includeGeometry=True)
-
-    # ### retrieve data
-    # results = overpass.query(query, timeout=OSMPT_TIMEOUT).toJSON()['elements']
-
 
     pois = defaultdict(lambda:[])
     for r in results:
@@ -379,11 +332,11 @@ class OSM(object):
       return distance
 
   @staticmethod 
-  def get_one_mile_bbox(clat, clon):
+  def get_bbox_by_width(clat, clon, width=MILE_TO_M):
     '''
     Return a bounding box around a centroid (clon,clat)
     '''
-    width = MILE_TO_M
+    #width = MILE_TO_M
     p = Point(clon, clat)
     project = pyproj.Transformer.from_crs(crs_from=PROJ_DEG, crs_to=PROJ_MET, always_xy=True).transform
     p_proj = transform(project, p)
@@ -420,6 +373,22 @@ class OSM(object):
         if not j.is_empty:
           junctions.append(j)
     return unary_union(junctions)
+
+  
+### osm area id
+# q = OSM.query_nominatim(lat=lat, lon=lon, reverse=True, zoom=ZOOM_MAJOR_AND_MINOR_STREETS, cacheDir=cache_dir)
+# # nominatim = Nominatim(cacheDir=cache_dir)
+# # q = nominatim.query(lat, lon, reverse=True, zoom=ZOOM_MAJOR_AND_MINOR_STREETS).toJSON()
+
+# if len(q) > 1:
+#   print(len(q))
+#   print(q)
+#   raise Exception("Should this happen?")
+
+# #info = q[0]
+# #bbox = info['boundingbox']
+# #bbox = [float(bbox[0]),float(bbox[2]),float(bbox[1]),float(bbox[3])]
+
 
 #def get_one_mile_bbox(clat, clon):
     # '''

@@ -16,6 +16,7 @@ from pyproj import Geod
 from shapely.geometry import Point
 from shapely.geometry import LineString
 from utils import ios
+from utils.constants import NONE
 
 ##############################################################################
 # CONSTANTS
@@ -46,7 +47,7 @@ SLEEP = 60 * 1 # 1 minute
 ##############################################################################
 class VIIRS(object):
 
-  def __init__(self, source, api_key, project_id):
+  def __init__(self, source, api_key, project_id, service_account):
     '''
     Constructor
     '''
@@ -61,15 +62,22 @@ class VIIRS(object):
     self.lights = None
     self.points = None
     self.intensity = None
-    self.API_KEY = None if api_key in ['',None,np.nan] else ios.read_txt(api_key)
-    self.PROJECT_ID = None if project_id in ['',None,np.nan] else ios.read_txt(project_id)
-    
+    self.API_KEY = None if api_key in NONE else ios.read_txt(api_key)
+    self.PROJECT_ID = None if project_id in NONE else ios.read_txt(project_id)
+    self.SERVICE_ACCOUNT = None if project_id in NONE else ios.read_txt(service_account)
+
+
   def auth(self):
-    if self.API_KEY is None:
-      ee.Authenticate()
+    try:
       ee.Initialize()
-    else:
-      ee.Initialize(project=self.PROJECT_ID, cloud_api_key=self.API_KEY)
+    except:
+      if self.API_KEY is None:
+        ee.Authenticate()
+        ee.Initialize()
+      else:
+        #credentials = ee.ServiceAccountCredentials(service_account, '.private-key.json')
+        #ee.Initialize(credentials)
+        ee.Initialize(project=self.PROJECT_ID, cloud_api_key=self.API_KEY)
     
   ###
   # Filters layers by date and aggregates by 'select' from the collection.
@@ -180,7 +188,7 @@ class VIIRS(object):
     df.loc[:,'frac_sum_rad'] = df.apply(lambda row: row.cons_avg_rad_sum/row.avg_rad_sum, axis=1)
     
     # 5. keeping necesary columns
-    km = round(buffer_meters/1000.,1)
+    km = round(buffer_meters/1000.,2)
     cols = {}
     for c in df.columns:
       if c in ['area_sum','avg_rad_count','avg_rad_sum'] or c.startswith("cons_"):
@@ -197,12 +205,12 @@ def get_cache_fn(path, data_size, buffer_meters, rad_gte_thres, scale, binid, nb
 def load_cache_results(path, data_size, buffer_meters, rad_gte_thres, scale, binid, nbins, nibinid=0, nibins=1):
   fn = get_cache_fn(path, data_size, buffer_meters, rad_gte_thres, scale, binid, nbins, nibinid, nibins)
   if ios.exists(fn):
-    return ios.load_csv(fn, verbose=True)
+    return ios.load_csv(fn, verbose=False)
   return None
 
 def cache_results(df, path, data_size, buffer_meters, rad_gte_thres, scale, binid, nbins, nibinid=0, nibins=1):
   fn = get_cache_fn(path, data_size, buffer_meters, rad_gte_thres, scale, binid, nbins, nibinid, nibins)
-  ios.save_csv(df, fn)
+  ios.save_csv(df, fn, verbose=False)
 
 
 #   ###
