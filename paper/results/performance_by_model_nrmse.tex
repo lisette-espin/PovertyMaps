@@ -1,0 +1,15 @@
+\begin{tabular}{llrrrrrr}
+\toprule
+{} &         features &  nrmse\_SL &  nrmse\_mean\_SL &  nrmse\_std\_SL &  nrmse\_UG &  nrmse\_mean\_UG &  nrmse\_std\_UG \\
+model          &                  &           &                &               &           &                &               \\
+\midrule
+CB             &         metadata &      0.64 &           0.46 &          0.81 &      0.65 &           0.46 &          0.83 \\
+CB\$\_w\$         &         metadata &      0.61 &           0.44 &          0.78 &      0.66 &           0.47 &          0.85 \\
+CNN            &           images &      0.74 &           0.57 &          0.90 &      0.77 &           0.60 &          0.94 \\
+CNN\$\_a\$        &           images &      0.76 &           0.59 &          0.94 &      0.75 &           0.59 &          0.91 \\
+CNN\$\_a\$+CB     &  images+metadata &      0.64 &           0.46 &          0.82 &      0.65 &           0.47 &          0.83 \\
+CNN\$\_a\$+CB\$\_w\$ &  images+metadata &      0.62 &           0.45 &          0.79 &      0.66 &           0.47 &          0.85 \\
+CNN+CB         &  images+metadata &      0.64 &           0.45 &          0.82 &      0.68 &           0.51 &          0.86 \\
+CNN+CB\$\_w\$     &  images+metadata &      0.62 &           0.45 &          0.80 &      0.69 &           0.52 &          0.86 \\
+\bottomrule
+\end{tabular}

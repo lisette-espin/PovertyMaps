@@ -1,0 +1,36 @@
+cff-version: 1.2.0
+message: "If you use this repository, please cite it as below."
+authors:
+- family-names: "Espin-Noboa"
+  given-names: "Lisette"
+  orcid: "https://orcid.org/0000-0002-3945-2966"
+- family-names: "Kertesz"
+  given-names: "Janos"
+  orcid: "https://orcid.org/0000-0003-4957-5406"
+- family-names: "Karsai"
+  given-names: "Marton"
+  orcid: "https://orcid.org/0000-0001-5382-8950"
+title: "Poverty Maps"
+version: 1.0.0
+date-released: 2023-02-15
+url: "https://github.com/lisette-espin/PovertyMaps"
+preferred-citation:
+  type: proceedings
+  authors:
+  - family-names: "Espín-Noboa"
+    given-names: "Lisette"
+    orcid: "https://orcid.org/0000-0002-3945-2966"
+  - family-names: "Kertész"
+    given-names: "János"
+    orcid: "https://orcid.org/0000-0003-4957-5406"
+  - family-names: "Karsai"
+    given-names: "Márton"
+    orcid: "https://orcid.org/0000-0001-5382-8950"
+  doi: "10.1145/3543507.3583862"
+  isbn: "978-1-4503-9416-1/23/04"
+  title: "Interpreting wealth distribution via poverty map inference using multimodal data"
+  collection-title: "In Proceedings of Association for Computing Machinery"
+  conference: "The ACM Web Conference 2023"
+  pages: 12
+  volume: 1
+  year: 2023

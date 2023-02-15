@@ -1,0 +1,15 @@
+\begin{tabular}{llrrrrrr}
+\toprule
+{} &         features &  rmse\_SL &  rmse\_mean\_SL &  rmse\_std\_SL &  rmse\_UG &  rmse\_mean\_UG &  rmse\_std\_UG \\
+model          &                  &          &               &              &          &               &              \\
+\midrule
+CB             &         metadata &     5.06 &          7.28 &         2.83 &     5.02 &          7.17 &         2.87 \\
+CB\$\_w\$         &         metadata &     4.81 &          6.91 &         2.71 &     5.12 &          7.31 &         2.93 \\
+CNN            &           images &     6.07 &          9.00 &         3.14 &     6.25 &          9.26 &         3.23 \\
+CNN\$\_a\$        &           images &     6.32 &          9.38 &         3.26 &     6.17 &          9.19 &         3.16 \\
+CNN\$\_a\$+CB     &  images+metadata &     5.06 &          7.28 &         2.84 &     5.04 &          7.19 &         2.88 \\
+CNN\$\_a\$+CB\$\_w\$ &  images+metadata &     4.97 &          7.19 &         2.76 &     5.09 &          7.25 &         2.92 \\
+CNN+CB         &  images+metadata &     4.99 &          7.12 &         2.86 &     5.42 &          7.87 &         2.96 \\
+CNN+CB\$\_w\$     &  images+metadata &     4.94 &          7.10 &         2.78 &     5.50 &          8.01 &         2.98 \\
+\bottomrule
+\end{tabular}
