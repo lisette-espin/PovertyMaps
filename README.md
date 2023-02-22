@@ -46,3 +46,5 @@ Check how wealth has changed over the years.
 
 ## Citation
 Lisette Espín-Noboa, János Kertész, and Márton Karsai. 2023. Interpreting wealth distribution via poverty map inference using multimodal data. In Proceedings of Association for Computing Machinery (TheWebConf ’23). ACM, New York, NY, USA, 12 pages. https://doi.org/10.1145/3543507.3583862
+
+*Pre-print:* https://arxiv.org/abs/2302.10793
