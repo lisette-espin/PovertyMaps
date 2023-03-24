@@ -22,12 +22,12 @@ Try out the [interactive tool](https://vis.csh.ac.at/poverty-maps) to see the hi
 
 Check how wealth may look now.
 <picture>
-<img width="1505" alt="screenshot" src="https://github.com/lisette-espin/PovertyMaps/blob/main/interactive_tool_predict.png">
+<img width="1505" alt="screenshot" src="https://github.com/lisette-espin/PovertyMaps/blob/main/README/interactive_tool_predict.png">
 </picture>
 
 Check how wealth has changed over the years.
 <picture>
-<img width="1505" alt="screenshot" src="https://github.com/lisette-espin/PovertyMaps/blob/main/interactive_tool_comparison.png">
+<img width="1505" alt="screenshot" src="https://github.com/lisette-espin/PovertyMaps/blob/main/README/interactive_tool_comparison.png">
 </picture>
 
 ## Scripts
@@ -48,3 +48,17 @@ Check how wealth has changed over the years.
 Lisette Espín-Noboa, János Kertész, and Márton Karsai. 2023. Interpreting wealth distribution via poverty map inference using multimodal data. In Proceedings of Association for Computing Machinery (TheWebConf ’23). ACM, New York, NY, USA, 12 pages. https://doi.org/10.1145/3543507.3583862
 
 *Pre-print:* https://arxiv.org/abs/2302.10793
+
+
+## Credits and Funding
+<picture>
+<img width="200" alt="CEU" src="https://github.com/lisette-espin/PovertyMaps/blob/main/README/CEU.jpeg">
+</picture>
+
+<picture>
+<img width="200" alt="CSH" src="https://github.com/lisette-espin/PovertyMaps/blob/main/README/CSH.png">
+</picture>
+
+<picture>
+<img width="200" alt="SoBigData++" src="https://github.com/lisette-espin/PovertyMaps/blob/main/README/SBDPP.png">
+</picture>
