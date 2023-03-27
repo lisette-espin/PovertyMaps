@@ -115,7 +115,6 @@ def get_model_fn(country, model, year=None):
     files = [fn for fn in files_3 if 'noaug' not in fn and 'weighted' in fn]
 
   # Out of 3 runs, search for the best
-  # @TODO: Should we create a 4th model, where we use the entire gt?
   eval_values = []
   for fn in files:
     if cnn:

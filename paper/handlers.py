@@ -320,7 +320,6 @@ def get_residuals(root, countries, output=None):
   df.loc[:,'model'] = df.loc[:,'model'].astype(MOD_TYPE)
   df.loc[:,'country'] = df.loc[:,'country'].astype(CategoricalDtype(categories=sorted(df.country.unique()), ordered=True))
   
-  
   return df
       
 def get_ground_truth(root, countries, output=None):
@@ -537,7 +536,7 @@ def summary_from_predictions(root, country):
       data = ios.load_csv(fn)
       
       # adding cluster metadata
-      fn_data = glob.glob(os.path.join(fn.split('/epoch')[0],'*','data.csv'))[0]
+      fn_data = glob.glob(f"{fn.split('-rs')[0]}*/data.csv")[0]
       tmp = ios.load_csv(fn_data) 
       data = data.set_index('cluster_id').join(tmp[['cluster_id','cluster_year','cluster_number',
                                                     'cluster_rural','pplace_cluster_distance']].set_index('cluster_id'))
@@ -559,6 +558,7 @@ def summary_from_predictions(root, country):
       pop_closest = data.population_closest_tile.values
       pop_mile = data.loc[:,'population_in_1.61km'].values
       cluster_id = data.index.values
+      
       # tmclass = data.apply(lambda row: int(row.true_mean_wi*n_classes/100), axis=1).values
       # pmclass = data.apply(lambda row: int(row.pred_mean_wi*n_classes/100), axis=1).values
       # tsclass = data.apply(lambda row: int(row.true_std_wi*n_classes/30), axis=1).values
@@ -596,7 +596,7 @@ def summary_from_predictions(root, country):
     except Exception as ex:
       print(f"[ERROR] summary_from_predictions | {ex} | {fn}")
       #pass
-  
+
   return df
 
 
@@ -947,7 +947,7 @@ def plot_poverty_maps(query, output=None):
   plt.show()
   plt.close()
   
-def plot_poverty_map(ccode, model, output=None):
+def plot_poverty_map(ccode, model, output=None, ext='pdf'):
   fn = f'results/pplaces_inference/{ccode}_{model}.csv'
   df1 = ios.load_csv(fn)
   fn = f'results/pplaces_inference/{ccode}_features.csv'
@@ -990,7 +990,7 @@ def plot_poverty_map(ccode, model, output=None):
   ax.collections[0].set_rasterized(True)
     
   if output is not None:
-    fn = os.path.join(output,f"sm_hr_poverty_map_{ccode}_{model}.pdf")
+    fn = os.path.join(output,f"sm_hr_poverty_map_{ccode}_{model}.{ext}")
     fig.savefig(fn, dpi=300, bbox_inches='tight')
     print(f"{fn} saved!")
     
@@ -1765,7 +1765,15 @@ def plot_variability(df_rs, df_gt, output=None):
     is_gt = data.kind.unique()[0]=='ground-truth'
     group = data.groupby('epoch')
     n = group.size().mean()
-    r,p = pearsonr(data.IWI_mean, data.IWI_std)
+    
+    r, p = [], []
+    for epoch,tmp in data.groupby('epoch'):
+      re,pe = pearsonr(tmp.IWI_mean, tmp.IWI_std)
+      r.append(re)
+      p.append(pe)    
+    r, p = np.mean(r), np.mean(p)
+    # r, p = pearsonr(data.IWI_mean, data.IWI_std)
+    
     pv = get_statistical_significance_symbol_from_pvalue(p)
     model = ','.join(data.model.unique())
     ax = plt.gca()
@@ -1776,7 +1784,8 @@ def plot_variability(df_rs, df_gt, output=None):
       y = 0.75
       ha = 'center'
       va = 'center'
-      ax.text(x=x, y=y, s=s, color='grey', va=va, ha=ha, transform=ax.transAxes, bbox=dict(facecolor='white', edgecolor='none',pad=0.0))
+      ax.text(x=x, y=y, s=s, color='grey', va=va, ha=ha, transform=ax.transAxes, 
+              bbox=dict(facecolor='white', edgecolor='none',pad=0.0))
 
     n = int(round(n))
     n = (r"$\overline{n}$=<n>, " if is_gt else '').replace('<n>',str(n))
@@ -1790,10 +1799,9 @@ def plot_variability(df_rs, df_gt, output=None):
     ax.text(x=x, y=y, s=s, color=kws['color'], va=va, ha=ha, transform=ax.transAxes, size=fs, 
             bbox=dict(facecolor='white', edgecolor='none',pad=0.0))
     ### Annotate end  
-  
 
   
-  # Only necesary data (best models)
+  # Only necesary data (best models) - test set (top gt, bottom prediction)
   tmp = df_rs.query("relocation==@RELOCATION_BEST and recency==@RECENCY_BEST and features in @MAIN_FEATURES").copy()
   tmp = tmp.query("(model==@SL_BEST_MODEL and country=='Sierra Leone') or (model==@UG_BEST_MODEL and country=='Uganda')").copy()
   tmp.rename(columns={'rural':'settlement'}, inplace=True)
@@ -1838,7 +1846,6 @@ def plot_variability(df_rs, df_gt, output=None):
   fg.map_dataframe(sns.regplot, x=xlabel, y=ylabel, order=POLYNOMIAL_DEGREE, x_ci='sd', scatter=False)
   fg.add_legend()
   fg.map_dataframe(sns.scatterplot, x=xlabel, y=ylabel, alpha=0.05)
-  #fg.axes[0,1].legend(loc='upper right', title='settlement')
   
   # titles (again), lables, and final touches
   fg.set_titles(row_template = '{row_name}', col_template = '{col_name}')
@@ -1871,11 +1878,18 @@ def plot_variability_full(df_rs, output=None):
     is_gt = data.kind.unique()[0]=='ground-truth'
     group = data.groupby('epoch')
     n = group.size().mean()
-    r,p = pearsonr(data.IWI_mean, data.IWI_std)
-    pv = get_statistical_significance_symbol_from_pvalue(p)
     model = ','.join(data.model.unique())
-    ax = plt.gca()
     
+    r, p = [], []
+    for epoch,tmp in data.groupby('epoch'):
+      re,pe = pearsonr(tmp.IWI_mean, tmp.IWI_std)
+      r.append(re)
+      p.append(pe)    
+    r, p = np.mean(r), np.mean(p)
+    # r, p = pearsonr(data.IWI_mean, data.IWI_std)
+    pv = get_statistical_significance_symbol_from_pvalue(p)
+    
+    ax = plt.gca()
     n = int(round(n))
     n = (r"$\overline{n}$=<n>, " if is_gt else '').replace('<n>',str(n))
     r = (r"$\overline{r}$=<r>").replace("<r>",f"{r:.2f}")
