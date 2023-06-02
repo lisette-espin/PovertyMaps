@@ -47,7 +47,7 @@ SLEEP = 60 * 1 # 1 minute
 ##############################################################################
 class VIIRS(object):
 
-  def __init__(self, source, year, api_key, project_id, service_account):
+  def __init__(self, source, year, api_key, project_id, service_account, client_secret):
     '''
     Constructor
     '''
@@ -66,18 +66,22 @@ class VIIRS(object):
     self.API_KEY = None if api_key in NONE else ios.read_txt(api_key)
     self.PROJECT_ID = None if project_id in NONE else ios.read_txt(project_id)
     self.SERVICE_ACCOUNT = None if project_id in NONE else ios.read_txt(service_account)
+    self.CLIENT_SECRET = None if project_id in NONE else client_secret
 
 
   def auth(self):
     try:
       ee.Initialize()
     except:
-      if self.API_KEY is None:
+      if self.SERVICE_ACCOUNT is not None:
+        credentials = ee.ServiceAccountCredentials(self.SERVICE_ACCOUNT, self.CLIENT_SECRET)
+        ee.Initialize(credentials)
+        
+      elif self.API_KEY is None and self.PROJECT_ID is None:
         ee.Authenticate()
         ee.Initialize()
+        
       else:
-        #credentials = ee.ServiceAccountCredentials(service_account, '.private-key.json')
-        #ee.Initialize(credentials)
         ee.Initialize(project=self.PROJECT_ID, cloud_api_key=self.API_KEY)
     
   ###
@@ -129,8 +133,7 @@ class VIIRS(object):
           
           for nibinid, chunk in enumerate(np.array_split(points,nibins)):
 
-            tmp = load_cache_results(cache_dir, self.year, allpoints.shape[0], buffer_meters, rad_gte_thres, 
-                                     scale, binid, nbins, nibinid, nibins)
+            tmp = load_cache_results(cache_dir, self.year, allpoints.shape[0], buffer_meters, rad_gte_thres, scale, binid, nbins, nibinid, nibins)
             if tmp is not None:
               df = df.append(tmp)
             else:
@@ -149,8 +152,7 @@ class VIIRS(object):
                 u3 = ee.Reducer.intervalMean(66,100)
                 
                 # 3. totals
-                total_cols = ['avg_rad_min','avg_rad_max','avg_rad_mean','avg_rad_median','avg_rad_l3_mean',
-                              'avg_rad_u3_mean','area_sum','avg_rad_count','avg_rad_sum']
+                total_cols = ['avg_rad_min','avg_rad_max','avg_rad_mean','avg_rad_median','avg_rad_l3_mean','avg_rad_u3_mean','area_sum','avg_rad_count','avg_rad_sum']
                 total_reducers = tc.combine(reducer2=ts, sharedInputs=True).combine(reducer2=tmi, sharedInputs=True).combine(reducer2=tma, sharedInputs=True).combine(reducer2=tme, sharedInputs=True).combine(reducer2=tmd, sharedInputs=True).combine(reducer2=l3, sharedInputs=True, outputPrefix="l3_").combine(reducer2=u3, sharedInputs=True, outputPrefix='u3_')
                 totals = self.image.reduceRegions(scale=scale,
                                                   collection=ee.FeatureCollection(rectangles),
@@ -166,8 +168,7 @@ class VIIRS(object):
                 
                 df_totals = pd.DataFrame([v['properties'] for v in totals['features']])[total_cols]
                 df_masks = pd.DataFrame([v['properties'] for v in masks['features']])[masked_cols]
-                df_masks.rename(columns={'area_sum':'cons_area_sum', 'avg_rad_count':'cons_avg_rad_count', 
-                                         'avg_rad_sum':'cons_avg_rad_sum'}, inplace=True)
+                df_masks.rename(columns={'area_sum':'cons_area_sum', 'avg_rad_count':'cons_avg_rad_count', 'avg_rad_sum':'cons_avg_rad_sum'}, inplace=True)
                 tmp = pd.concat([df_totals, df_masks], axis=1)
                 cache_results(tmp, cache_dir, self.year, allpoints.shape[0], buffer_meters, rad_gte_thres, scale, binid, nbins, nibinid, nibins)
                 df = df.append(tmp)
@@ -215,3 +216,90 @@ def load_cache_results(path, year, data_size, buffer_meters, rad_gte_thres, scal
 def cache_results(df, path, year, data_size, buffer_meters, rad_gte_thres, scale, binid, nbins, nibinid=0, nibins=1):
   fn = get_cache_fn(path, year, data_size, buffer_meters, rad_gte_thres, scale, binid, nbins, nibinid, nibins)
   ios.save_csv(df, fn, verbose=False)
+
+
+#   ###
+#   # Luminosity at point
+#   ###
+#   def lights_at_point(self, lat, lon):
+#     '''
+#     It returns the luminosity at exactly lat,lon (Point) location.
+#     '''
+#     xy = ee.Geometry.Point([lon, lat])
+#     return self.lights.sample(xy, RESOLUTION).first().get(self.key).getInfo()
+
+
+#   ###
+#   # Aggregates luminosity within rectangular areas
+#   ###
+#   def lights_at_points(self, points, aggfnc='mean', buffer_meters=1.0):
+#     '''
+#     Given a list of (lat,lon) points, it creates a rectangular buffer around 
+#     each of them with width 'buffer_meters'. Then it retrieves all light regions
+#     from these rectangles (buffers) to later get the night instensity of these
+#     areas.
+#     '''
+#     if aggfnc not in AGGREGATE_FUNCTIONS:
+#       raise Exception("aggregate funcion not supperted.")
+
+#     buffers = []
+#     for lat,lon in tqdm(points, total=len(points)):
+#       #xy = ee.Geometry.Point([lon, lat])
+#       #tmp = xy.buffer(buffer_meters) # to get an average over a larger area (circular)
+
+#       sq = ee.Geometry.Rectangle(get_min_max_coord_rectangle(lat, lon, buffer_meters))
+#       tmp = sq.buffer(0.001) # (meters) to get an average over a larger area (rectangular)
+#       buffers.append(tmp)
+
+#     self.regions = self.lights.reduceRegions(scale=RESOLUTION,
+#                                        collection=ee.FeatureCollection(buffers), 
+#                                        reducer=AGGREGATE_FUNCTIONS[aggfnc]).getInfo()
+#     #self.points = points
+#     self.intensities = [v['properties'][self.key] for v in self.regions['features']]
+
+# ###
+# # Given a centroid (clat, clon) it returns the bounding box coordinates
+# # of a recangle centered at clat,clon. It's width is given by 'width_meters'.
+# ##
+# def get_min_max_coord_rectangle(clat, clon, width_meters):
+#   '''
+#   @TODO: Find a better way to compute a lat,lon from clat,clon + distance
+#   eg. https://code.earthengine.google.com/3dc6ac4e72eb0456745c85698e91cc7e
+#   '''
+#   centroid = Point(clon, clat)
+#   distance = width_meters / 2.
+#   geod = Geod(ellps="WGS84")
+
+#   # bottom (y, lat)
+#   lat1 = clat
+#   while True:
+#     lat1 -= 0.00001
+#     d = geod.geometry_length(LineString([centroid, Point(clon,lat1)])) # in meters
+#     if d >= int(distance)-1 and d <= int(distance)+1:
+#       break
+
+#   # top (y, lat)
+#   lat2 = clat
+#   while True:
+#     lat2 += 0.00001
+#     d = geod.geometry_length(LineString([centroid, Point(clon,lat2)])) # in meters
+#     if d >= int(distance)-1 and d <= int(distance)+1:
+#       break
+
+#   # left (x, lon)
+#   lon1 = clon
+#   while True:
+#     lon1 -= 0.00001
+#     d = geod.geometry_length(LineString([centroid, Point(lon1,clat)])) # in meters
+#     if d >= int(distance)-1 and d <= int(distance)+1:
+#       break
+
+#   # right (x, lon)
+#   lon2 = clon
+#   while True:
+#     lon2 += 0.00001
+#     d = geod.geometry_length(LineString([centroid, Point(lon2,clat)])) # in meters
+#     if d >= int(distance)-1 and d <= int(distance)+1:
+#       break
+
+#   return [lon1, lat1, lon2, lat2]
