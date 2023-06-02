@@ -11,14 +11,16 @@ meters=0 # comma separated widths (bbox) to query
 distance=-1 # max distance between cells (same antenna)
 radius=0 # radius for FBM
 unit='kilometer' # kilometer or mile
+size='' # google maps static api size "WxH"
 secretfn="../resources/maps/staticmaps/secret"
 keyfn="../resources/maps/staticmaps/api_key"
 tokensdir='../resources/Facebook/MarketingAPI/tokens'
-apikey="" # GEE VIIRS
-projectid="" # GEE VIIRS
-servicename="" # GEE VIIRS
+apikey="../resources/maps/googleearth/api_key" # GEE VIIRS
+projectid="../resources/maps/googleearth/project_id" # GEE VIIRS
+servicename="../resources/maps/googleearth/service_account" # GEE VIIRS
+clientsecret="../resources/maps/googleearth/clientsecret.json" # GEE VIIRS
 
-while getopts ":r:c:y:n:f:w:d:m:i:u:t:" opt; do
+while getopts ":r:c:y:n:w:d:m:i:u:z:t:" opt; do
   case $opt in
     r) root="$OPTARG"
     ;;
@@ -37,6 +39,8 @@ while getopts ":r:c:y:n:f:w:d:m:i:u:t:" opt; do
     i) radius="$OPTARG"
     ;;
     u) unit="$OPTARG"
+    ;;
+    z) size="$OPTARG"
     ;;
     t) tokensdir="$OPTARG"
     ;;
@@ -76,8 +80,8 @@ python batch_population.py -r "$root" -y "$years" -m "$meters" 2>&1 | tee -a "$f
 
 # 3. Get nightlight intensity features
 echo "====================================================================" 2>&1 | tee -a "$fnlog"
-echo "python batch_nightlights.py -r $root -y $years -m $meters -a $apikey -p $projectid -s $servicename" 2>&1 | tee -a "$fnlog"
-python batch_nightlights.py -r "$root" -y "$years" -m "$meters" -a "$apikey" -p "$projectid" -s "$servicename" 2>&1 | tee -a "$fnlog"
+echo "python batch_nightlights.py -r $root -y $years -m $meters -a $apikey -p $projectid -s $servicename" -c "$clientsecret" 2>&1 | tee -a "$fnlog"
+python batch_nightlights.py -r "$root" -y "$years" -m "$meters" -a "$apikey" -p "$projectid" -s "$servicename" -c "$clientsecret" 2>&1 | tee -a "$fnlog"
 
 # 4. Load cell-antennas 
 echo "====================================================================" 2>&1 | tee -a "$fnlog"
@@ -91,8 +95,8 @@ python batch_movement.py -r "$root" -y "$years" -j $njobs 2>&1 | tee -a "$fnlog"
 
 # 6. Get satellite images features
 echo "====================================================================" 2>&1 | tee -a "$fnlog"
-echo "python batch_staticmaps.py -r $root -y $years -s $secretfn -k $keyfn" 2>&1 | tee -a "$fnlog"
-python batch_staticmaps.py -r "$root" -y "$years" -s "$secretfn" -k "$keyfn" 2>&1 | tee -a "$fnlog"
+echo "python batch_staticmaps.py -r $root -y $years -z $size -s $secretfn -k $keyfn" 2>&1 | tee -a "$fnlog"
+python batch_staticmaps.py -r "$root" -y "$years" -z "$size" -s "$secretfn" -k "$keyfn" 2>&1 | tee -a "$fnlog"
 
 # 7. Get OpenStreetMap features
 echo "====================================================================" 2>&1 | tee -a "$fnlog"

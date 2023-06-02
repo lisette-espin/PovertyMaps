@@ -37,6 +37,6 @@ cp "../resources/OpenCellid/country/cell_towers_$country".csv "$folder/connectiv
 cp "../resources/Facebook/Movement/$country/"*_csv.zip "$folder/movement/Facebook/"
 cp "../resources/Facebook/Population/$country/"*_general_2020_csv.zip "$folder/population/Facebook/"
 
-# Google earth engine auth
-echo "./auth_gee.sh"
-./auth_gee.sh
+# Google earth engine auth (not needed anymore, now we use client_secret as param)
+#echo "./auth_gee.sh"
+#./auth_gee.sh

@@ -27,7 +27,7 @@ from utils.constants import LAT
 # Functions
 ###############################################################################
 
-def run(root, years, meters, api_key, project_id, service_account):
+def run(root, years, meters, api_key, project_id, service_account, client_secret):
   # validation
   validations.validate_not_empty(root,'root')
   meters = validations.validate_meters(meters)
@@ -52,7 +52,7 @@ def run(root, years, meters, api_key, project_id, service_account):
   for year, m in tqdm(itertools.product(years,meters), total=total):
     # constructor per year
     if newyear != year:
-      nl = VIIRS(source="viirs", year=year, api_key=api_key, project_id=project_id, service_account=service_account)
+      nl = VIIRS(source="viirs", year=year, api_key=api_key, project_id=project_id, service_account=service_account, client_secret=client_secret)
       nl.auth()
       if today is None:
         # year of ground-turth data
@@ -94,11 +94,12 @@ if __name__ == "__main__":
     parser.add_argument("-a", help="Path to API_KEY.", type=str, required=False)
     parser.add_argument("-p", help="Path to PROJECT_ID.", type=str, required=False)
     parser.add_argument("-s", help="Path to SERVICE_ACCOUNT.", type=str, required=False)
+    parser.add_argument("-c", help="Path to CLIENT_SECRET (json file).", type=str, required=False)
     
     args = parser.parse_args()
     for arg in vars(args):
       print("{}: {}".format(arg, getattr(args, arg)))
       
     start_time = time.time()
-    run(args.r, args.y, args.m, args.a, args.p, args.s)
+    run(args.r, args.y, args.m, args.a, args.p, args.s, args.c)
     print("--- %s seconds ---" % (time.time() - start_time))
