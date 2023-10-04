@@ -50,9 +50,7 @@ class FacebookMovement(object):
     if querystr is not None:
       self.gdf_data = self.gdf_data.query(querystr, engine='python').copy()
 
-    self.gdf_data.drop(columns=['start_polygon_name','end_polygon_name','start_polygon_id','end_polygon_id',
-                                'tile_size','level','n_difference','percent_change','is_statistically_significant',
-                                'z_score','start_lon','start_lat','end_lat','end_lon','start_quadkey','end_quadkey'], inplace=True)
+    self.gdf_data.drop(columns=['start_polygon_name','end_polygon_name','start_polygon_id','end_polygon_id','tile_size','level','n_difference','percent_change','is_statistically_significant','z_score','start_lon','start_lat','end_lat','end_lon','start_quadkey','end_quadkey'], inplace=True)
     gc.collect()
 
   def generate_network(self, includenan=True):
@@ -95,10 +93,11 @@ class FacebookMovement(object):
     source_index, target_index, distances, weights = np.hsplit(edges.values, 4)
     self.M = csr_matrix((weights.ravel(), (source_index.ravel(), target_index.ravel())), shape=(n, n))                  # number of people
     self.A = csr_matrix((np.ones(self.M.count_nonzero()), (source_index.ravel(), target_index.ravel())), shape=(n, n))  # number of places
-    self.D = csr_matrix((distances.ravel(), (source_index.ravel(), target_index.ravel())), shape=(n, n))                # average traversed distance
+    self.D = csr_matrix((distances.ravel(), (source_index.ravel(), target_index.ravel())), shape=(n, n))                 # average traversed distance
 
   def get_features(self, df):
     ### 0. lon,lat columns
+    #id,lon,lat = ("DHSID","LONGNUM","LATNUM") if 'LATNUM' in df.columns else ('OSMID','lon','lat')
     id = validations.get_column_id(df)
     lon,lat = LON,LAT
 
@@ -216,9 +215,20 @@ def load_files_from_zip(fn, togeopandas=False, parallel=True, testing=False):
             #   for index,row in tmp.iterrows():
             #     tmp.loc[index,'geometry'] = '{},{}'.format(index,row.geometry)
             #   tmp.reset_index(drop=True, inplace=True)
-              
+            
+            if tmp.query("~geometry.str.startswith('LINE')", engine='python').shape[0] > 0:
+              ### when no escaping (then correct geometry)
+              for index,row in tmp.iterrows():
+                old_g = row.geometry
+                new_g = f'LINESTRING ({row.start_lon} {row.start_lat}, {row.end_lon} {row.end_lat})'
+                tmp.loc[index,'geometry'] = new_g
+                row.geometry = new_g
+                #print(f":::{old_g}:::{new_g}:::{row.geometry}:::{filename}")
+              tmp.reset_index(drop=True, inplace=True)
+            
             #df = df.append(tmp, ignore_index=True)
             df = pd.concat([df,tmp], ignore_index=True)
+              
   except Exception as ex:
     print(f"[ERROR] movement.py | load_files_from_zip #1 | {ex} | fn:{fn}")
     df = None

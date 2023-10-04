@@ -24,7 +24,9 @@ from utils.constants import *
 # Functions
 ###############################################################################
 
-def run(root, years, secretfn, keyfn):
+def run(root, years, size, secretfn, keyfn):
+  # size: a string 'WxH', each value (width and heigh) is in pixels
+  
   # validation
   validations.validate_not_empty(root,'root')
   
@@ -37,16 +39,17 @@ def run(root, years, secretfn, keyfn):
   KEY = ios.read_txt(keyfn)
   folder = validations.get_places_kind(df_places)
   CACHEDIR = os.path.join(root,'results','staticmaps',folder)
-
+  size = SIZE if size in NONE else size
+  
   ### query API
-  query_api(df_places, SECRET, KEY, CACHEDIR)
+  query_api(df_places, size, SECRET, KEY, CACHEDIR)
   print(f"- Images stored in: {CACHEDIR}")
 
-def query_api(df_places, SECRET, KEY, CACHEDIR):
+def query_api(df_places, size, SECRET, KEY, CACHEDIR):
   results = []
   counter = 0
   for id,row in tqdm(df_places.iterrows(), total=df_places.shape[0]):
-    sm = StaticMaps(key=KEY, secret=SECRET, lat=row.lat, lon=row.lon, size=SIZE, zoom=ZOOM, scale=SCALE, maptype=MAPTYPE)
+    sm = StaticMaps(key=KEY, secret=SECRET, lat=row.lat, lon=row.lon, size=size, zoom=ZOOM, scale=SCALE, maptype=MAPTYPE)
     prefix = StaticMaps.get_prefix(row) #'Y{}-C{}-U{}'.format(int(row.year), int(row.cluster), int(row.rural)) if GTID in df_places else 'OSMID{}'.format(row.OSMID)
     results.append((id, sm.retrieve_and_save(CACHEDIR, prefix=prefix, verbose=False, load=True)))
     
@@ -66,6 +69,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("-r", help="Country's main folder.", type=str, required=True)
     parser.add_argument("-y", help="Year or years separated by comma (E.g. 2016,2019).", type=str, default=None, required=False)
+    parser.add_argument("-z", help="Image size 'WxH' width and height in pixels", type=str, default=None, required=False)
     parser.add_argument("-s", help="Path to secret Google Maps Static API.", type=str, required=True)
     parser.add_argument("-k", help="Path to key Google Maps Static API", type=str, required=True)
     
@@ -74,5 +78,5 @@ if __name__ == "__main__":
       print("{}: {}".format(arg, getattr(args, arg)))
 
     start_time = time.time()
-    run(args.r, args.y, args.s, args.k)
+    run(args.r, args.y, args.z, args.s, args.k)
     print("--- %s seconds ---" % (time.time() - start_time))

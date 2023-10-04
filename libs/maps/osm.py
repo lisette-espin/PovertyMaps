@@ -259,8 +259,7 @@ class OSM(object):
     kind = 'highway'
     tags = '|'.join(TAGS[kind])
     selector = "'{}'~'{}'".format(kind,tags)
-    results = OSM.get_query_builder_results(bbox=bbox, selector=selector, elementType='way', out='body', 
-                                            includeGeometry='True', cache_dir=cache_dir)
+    results = OSM.get_query_builder_results(bbox=bbox, selector=selector, elementType='way', out='body', includeGeometry='True', cache_dir=cache_dir)
 
     ### length of road
     roads = defaultdict(list)
@@ -292,8 +291,7 @@ class OSM(object):
     ### query
     kind = 'building'
     selector = "'{}'='yes'".format(kind)
-    results = OSM.get_query_builder_results(bbox=bbox, selector=selector, elementType='way', out='body', 
-                                            includeGeometry='True', cache_dir=cache_dir)
+    results = OSM.get_query_builder_results(bbox=bbox, selector=selector, elementType='way', out='body', includeGeometry='True', cache_dir=cache_dir)
 
     buildings = []
     d5 = 0
@@ -317,8 +315,7 @@ class OSM(object):
     kind = 'amenity'
     tags = '|'.join(TAGS[kind])
     selector = "'{}'~'{}'".format(kind,tags)
-    results = OSM.get_query_builder_results(bbox=bbox, selector=selector, elementType='node', out='body', 
-                                            includeGeometry='True', cache_dir=cache_dir)
+    results = OSM.get_query_builder_results(bbox=bbox, selector=selector, elementType='node', out='body', includeGeometry='True', cache_dir=cache_dir)
 
     pois = defaultdict(lambda:[])
     for r in results:
@@ -399,3 +396,57 @@ class OSM(object):
           junctions.append(j)
     return unary_union(junctions)
 
+  
+### osm area id
+# q = OSM.query_nominatim(lat=lat, lon=lon, reverse=True, zoom=ZOOM_MAJOR_AND_MINOR_STREETS, cacheDir=cache_dir)
+# # nominatim = Nominatim(cacheDir=cache_dir)
+# # q = nominatim.query(lat, lon, reverse=True, zoom=ZOOM_MAJOR_AND_MINOR_STREETS).toJSON()
+
+# if len(q) > 1:
+#   print(len(q))
+#   print(q)
+#   raise Exception("Should this happen?")
+
+# #info = q[0]
+# #bbox = info['boundingbox']
+# #bbox = [float(bbox[0]),float(bbox[2]),float(bbox[1]),float(bbox[3])]
+
+
+#def get_one_mile_bbox(clat, clon):
+    # '''
+    # @TODO: Find a better way to compute a lat,lon from clat,clon + distance
+    # '''
+    # centroid = Point(clon, clat)
+    # wh = 1609.34 # width and height of bbx of 1 mile (1609.34 meters)
+    # distance = wh / 2.
+    # geod = Geod(ellps="WGS84")
+
+    # lat1 = clat
+    # while True:
+    #   lat1 -= 0.00001
+    #   d = geod.geometry_length(LineString([centroid, Point(clon,lat1)])) # in meters
+    #   if d >= int(distance)-1 and d <= int(distance)+1:
+    #     break
+
+    # lat2 = clat
+    # while True:
+    #   lat2 += 0.00001
+    #   d = geod.geometry_length(LineString([centroid, Point(clon,lat2)])) # in meters
+    #   if d >= int(distance)-1 and d <= int(distance)+1:
+    #     break
+
+    # lon1 = clon
+    # while True:
+    #   lon1 -= 0.00001
+    #   d = geod.geometry_length(LineString([centroid, Point(lon1,clat)])) # in meters
+    #   if d >= int(distance)-1 and d <= int(distance)+1:
+    #     break
+
+    # lon2 = clon
+    # while True:
+    #   lon2 += 0.00001
+    #   d = geod.geometry_length(LineString([centroid, Point(lon2,clat)])) # in meters
+    #   if d >= int(distance)-1 and d <= int(distance)+1:
+    #     break
+
+    # return [lat1, lon1, lat2, lon2]

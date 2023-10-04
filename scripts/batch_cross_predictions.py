@@ -28,7 +28,7 @@ from utils import constants
 from utils.augmentation import RandomColorDistortion
 
 ROOT = '../data'
-COUNTRIES = {k:v for k,v in constants.COUNTRIES.items() if k in ['Sierra Leone','Uganda']}
+COUNTRIES = {k:v for k,v in constants.COUNTRIES.items() if k in ['Sierra Leone','Uganda','Hungary']}
 MODELS = OrderedDict({'catboost':'CB', 
                       'weighted_catboost':'CB$_w$', 
                       'cnn':'CNN', 
@@ -40,7 +40,8 @@ MODELS = OrderedDict({'catboost':'CB',
 MODELS_CB = [MODELS['catboost'], MODELS['weighted_catboost']]
 MODELS_CNN = [MODELS['cnn'], MODELS['cnn_aug']]
 MODELS_FMAP = [MODELS['cnn+catboost'], MODELS['cnn+weighted_catboost'], MODELS['cnn_aug+catboost'], MODELS['cnn_aug+weighted_catboost']]
-OUTPUT = '../paper/results/cross_modeling_fmaps'
+RESULTS = '../paper/results/'
+OUTPUT = os.path.join(RESULTS, 'cross_modeling_fmaps')
 
 #################################################################################
 # Main
@@ -57,11 +58,11 @@ def run():
     df_residuals = pd.concat([df_residuals, partial_residuals], ignore_index=True)
       
   # save to file
-  fn = '../paper/results/residuals_cross_country_testing.csv'
+  fn = os.path.join(RESULTS, 'residuals_cross_country_testing.csv')
   df_residuals.to_csv(fn, index=True)
   print(f"{fn} saved!")
   
-  fn = '../paper/results/performance_cross_country_testing.csv'
+  fn = os.path.join(RESULTS, 'performance_cross_country_testing.csv')
   df_performance.to_csv(fn, index=True)
   print(f"{fn} saved!")
   
@@ -82,6 +83,9 @@ def cross_country_prediction(source_country, target_country):
   files_4  = glob.glob(os.path.join(source_root,'*','*','model.json')) # cb
 
   files = files_1 + files_2 + files_3 + files_4 
+  
+  files = [fn for fn in files if 'xgb' in fn and 'cnn' not in fn] ### DELETE THIS LINE
+  
   print(f"[INFO] {len(files)} models to load from {root_models}.")
 
   # results
@@ -211,6 +215,7 @@ def ccp_cnn(model_fn, model_name, source_country, target_country, root, years, d
     n = y_pred.shape[0]
     obj = {'source_country':[source_country]*n, 'source_model':[model_name]*n, 'source_runid':[source_runid]*n, 'source_rs':[source_rs]*n,
            'target_country':[target_country]*n, 'target_runid':[target_runid]*n, 'target_rs':[target_rs]*n, 
+           'features_source':features_source,
            'true_mean':tm, 'true_std':ts,
            'pred_mean':pm, 'pred_std':ps,
            'residual_mean':rm, 'residual_std':rs}
@@ -236,6 +241,7 @@ def ccp_cnn(model_fn, model_name, source_country, target_country, root, years, d
 
     obj = {'source_country':source_country, 'source_model':model_name, 'source_runid':source_runid, 'source_rs':source_rs,
            'target_country':target_country, 'target_runid':target_runid, 'target_rs':target_rs, 
+           'features_source':features_source,
            'r2':r2, 'mse':mse, 'rmse':rmse, 'nrmse':nrmse,
            'r2_mean':r2_mean, 'mse_mean':mse_mean, 'rmse_mean':rmse_mean, 'nrmse_mean':nrmse_mean,
            'r2_std':r2_std, 'mse_std':mse_std, 'rmse_std':rmse_std, 'nrmse_std':nrmse_std}
@@ -316,6 +322,7 @@ def ccp_cnn_cb(model_fn, model_name, source_country, target_country, root, years
     n = y_pred.shape[0]
     obj = {'source_country':[source_country]*n, 'source_model':[model_name]*n, 'source_runid':[source_runid]*n, 'source_rs':[source_rs]*n,
            'target_country':[target_country]*n, 'target_runid':[target_runid]*n, 'target_rs':[target_rs]*n, 
+           'features_source':features_source,
            'true_mean':tm, 'true_std':ts,
            'pred_mean':pm, 'pred_std':ps,
            'residual_mean':rm, 'residual_std':rs}
@@ -341,6 +348,7 @@ def ccp_cnn_cb(model_fn, model_name, source_country, target_country, root, years
 
     obj = {'source_country':source_country, 'source_model':model_name, 'source_runid':source_runid, 'source_rs':source_rs,
            'target_country':target_country, 'target_runid':target_runid, 'target_rs':target_rs, 
+           'features_source':features_source,
            'r2':r2, 'mse':mse, 'rmse':rmse, 'nrmse':nrmse,
            'r2_mean':r2_mean, 'mse_mean':mse_mean, 'rmse_mean':rmse_mean, 'nrmse_mean':nrmse_mean,
            'r2_std':r2_std, 'mse_std':mse_std, 'rmse_std':rmse_std, 'nrmse_std':nrmse_std}
@@ -397,6 +405,7 @@ def ccp_cb(model_fn, model_name, source_country, target_country, root, years, dh
     n = y_pred.shape[0]
     obj = {'source_country':[source_country]*n, 'source_model':[model_name]*n, 'source_runid':[source_runid]*n, 'source_rs':[source_rs]*n,
            'target_country':[target_country]*n, 'target_runid':[target_runid]*n, 'target_rs':[target_rs]*n, 
+           'features_source':features_source,
            'true_mean':tm, 'true_std':ts,
            'pred_mean':pm, 'pred_std':ps,
            'residual_mean':rm, 'residual_std':rs}
@@ -422,6 +431,7 @@ def ccp_cb(model_fn, model_name, source_country, target_country, root, years, dh
 
     obj = {'source_country':source_country, 'source_model':model_name, 'source_runid':source_runid, 'source_rs':source_rs,
            'target_country':target_country, 'target_runid':target_runid, 'target_rs':target_rs, 
+           'features_source':features_source,
            'r2':r2, 'mse':mse, 'rmse':rmse, 'nrmse':nrmse,
            'r2_mean':r2_mean, 'mse_mean':mse_mean, 'rmse_mean':rmse_mean, 'nrmse_mean':nrmse_mean,
            'r2_std':r2_std, 'mse_std':mse_std, 'rmse_std':rmse_std, 'nrmse_std':nrmse_std}

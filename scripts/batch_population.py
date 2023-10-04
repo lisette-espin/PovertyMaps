@@ -34,10 +34,14 @@ def run(root, years, meters):
     pbar.update(1)
     fb.project_data()
     pbar.update(1)
-
-  # update features
+  print(fb.gdf_places_proj.head(1))
+  print(fb.gdf_pop_proj.head(1))
+  print('pplaces cells: ',fb.gdf_places_proj.shape, '| FBP cells', fb.gdf_pop_proj.shape)
+    
+  # update features  
+  print('Updating features...')
   df_places_new = fb.update_population_features(meters)
-  print(df_places_new.head())
+  print(df_places_new.head(1))
   print(df_places_new.shape)
 
   # save

@@ -86,6 +86,7 @@ class SESImages(object):
     print("TF version:", tf.__version__)
     #print("Hub version:", hub.__version__)
     print("GPU is", "available" if tf.config.list_physical_devices('GPU') else "NOT AVAILABLE")
+    print(f"gpus: {self.gpus}")
     print("===================================================")
     np.random.seed(self.rs)
     set_seed(self.rs)
@@ -100,8 +101,15 @@ class SESImages(object):
       os.environ["CUDA_VISIBLE_DEVICES"]=self.gpus
         
     os.environ["TF_GPU_ALLOCATOR"]="cuda_malloc_async"
-    print("CUDA_VISIBLE_DEVICES:", os.environ["CUDA_VISIBLE_DEVICES"])
-    print("TF_GPU_ALLOCATOR:", os.environ["TF_GPU_ALLOCATOR"])
+    try:
+      print("CUDA_VISIBLE_DEVICES:", os.environ["CUDA_VISIBLE_DEVICES"])
+    except:
+      pass
+      
+    try:
+      print("TF_GPU_ALLOCATOR:", os.environ["TF_GPU_ALLOCATOR"])
+    except:
+      pass
     print("===================================================")
     self.create_results_path(path)
 
@@ -207,8 +215,7 @@ class SESImages(object):
       duration_fit = time.time() - start
       
       start = time.time()
-      results = model.evaluate(X_val, y_val, batch_size=params['batch_size'], workers=n_jobs, use_multiprocessing=False, 
-                               return_dict=True, verbose=1)
+      results = model.evaluate(X_val, y_val, batch_size=params['batch_size'], workers=n_jobs, use_multiprocessing=False, return_dict=True, verbose=1)
       duration_eval = time.time() - start
       
       loss = results['loss']
@@ -291,6 +298,8 @@ class SESImages(object):
 
   @staticmethod
   def needs_tuning_runid_fold(path, model_name, offaug, runid, rs, fold):
+    # fn = os.path.join(path,model_name,CNN_TUNNING_SUMMARY_FILE)
+    # path = os.path.join(path, model_name)
     path = SESImages.get_results_path(path, model_name, offaug)
     fn_eval = SESImages.get_tuning_file(path)
     print("------------------------------------------------------> fn_eval:", fn_eval)
@@ -317,6 +326,8 @@ class SESImages(object):
   def best_hyper_params(path, model_name, offaug):
     import json
     path = SESImages.get_results_path(path, model_name, offaug)
+    # fn_eval = os.path.join(path,CNN_TUNNING_SUMMARY_FILE)
+    # fn_best = os.path.join(path,CNN_BEST_PARAMS_FILE)
     fn_eval = SESImages.get_tuning_file(path)
     fn_best = SESImages.get_best_hp_file(path)
 
@@ -513,10 +524,8 @@ class SESImages(object):
       labels = [str(c) for c in sestrue.categories]
       sestrue = sestrue.astype(str)
       sespred = sespred.astype(str)
-      viz.plot_confusion_matrix(sestrue, sespred, fn=os.path.join(self.results_path,f'plot_confusion_10ses_mean.{PLOTEXT}'), 
-                                labels=labels, norm=False)
-      viz.plot_confusion_matrix(sestrue, sespred, fn=os.path.join(self.results_path,f'plot_confusion_10ses_mean_norm.{PLOTEXT}'), 
-                                labels=labels, norm=True) 
+      viz.plot_confusion_matrix(sestrue, sespred, fn=os.path.join(self.results_path,f'plot_confusion_10ses_mean.{PLOTEXT}'), labels=labels, norm=False)
+      viz.plot_confusion_matrix(sestrue, sespred, fn=os.path.join(self.results_path,f'plot_confusion_10ses_mean_norm.{PLOTEXT}'),  labels=labels, norm=True) 
       
       # n classes std IWI (just to know)
       bins, minv, maxv = 10,0,np.ceil(max(max(y[:,1]),max(ypred[:,1])))
@@ -525,10 +534,8 @@ class SESImages(object):
       labels = [str(c) for c in sestrue.categories]
       sestrue = sestrue.astype(str)
       sespred = sespred.astype(str)
-      viz.plot_confusion_matrix(sestrue, sespred, fn=os.path.join(self.results_path,f'plot_confusion_10ses_std.{PLOTEXT}'), 
-                                labels=labels,  norm=False)
-      viz.plot_confusion_matrix(sestrue, sespred, fn=os.path.join(self.results_path,f'plot_confusion_10ses_std_norm.{PLOTEXT}'), 
-                                labels=labels,  norm=True) 
+      viz.plot_confusion_matrix(sestrue, sespred, fn=os.path.join(self.results_path,f'plot_confusion_10ses_std.{PLOTEXT}'), labels=labels,  norm=False)
+      viz.plot_confusion_matrix(sestrue, sespred, fn=os.path.join(self.results_path,f'plot_confusion_10ses_std_norm.{PLOTEXT}'), labels=labels,  norm=True) 
     
       # 4 classes (universal)
       col = '_mwi'
@@ -543,10 +550,8 @@ class SESImages(object):
       sestrue = np.argmax(y, axis=1)
       
     # plot confusion matrix (SES values)
-    viz.plot_confusion_matrix(sestrue, sespred, fn=os.path.join(self.results_path,f'plot_confusion.{PLOTEXT}'), 
-                              labels=SES_LABELS, norm=False)
-    viz.plot_confusion_matrix(sestrue, sespred, fn=os.path.join(self.results_path,f'plot_confusion_norm.{PLOTEXT}'), 
-                              labels=SES_LABELS, norm=True) 
+    viz.plot_confusion_matrix(sestrue, sespred, fn=os.path.join(self.results_path,f'plot_confusion.{PLOTEXT}'), labels=SES_LABELS, norm=False)
+    viz.plot_confusion_matrix(sestrue, sespred, fn=os.path.join(self.results_path,f'plot_confusion_norm.{PLOTEXT}'), labels=SES_LABELS, norm=True) 
   
     return ypred
     
@@ -665,12 +670,14 @@ import random
 
 class Augmentation(object):
 
-  def __init__(self, root, years, dhsloc, probability_aug=None):
+  def __init__(self, root, years, dhsloc, probability_aug=None, img_width=None, img_height=None):
     self.root = root
     self.dhsloc = dhsloc
     self.prefix = ios.get_prefix_surveys(root=root, years=years)
     self.df_locations = None
     self.probability_augmentation = PROB_AUGMENTED if probability_aug is None else probability_aug
+    self.img_width = IMG_WIDTH if img_width is None else img_width
+    self.img_height = IMG_HEIGHT if img_height is None else img_height
     
     print("1. Init")
     self.fn_locations = os.path.join(self.root, 'results', 'features', f"{self.prefix}_{dhsloc}_cluster_pplace_ids.csv")
@@ -714,13 +721,23 @@ class Augmentation(object):
     flag = False
 
     rv = np.random.rand()
+    #print('rv:',rv,'prob:',(1-self.probability_augmentation))
     
     if  rv >= (1-self.probability_augmentation):
       
       ### 1. getting image
       path = self.path_pplaces_imgs if not pd.isna(row.OSMID) else self.path_clusters_imgs
       prefix = StaticMaps.get_prefix(row)
-      fn = StaticMaps.get_satellite_img_filename(prefix, ZOOM, SCALE, MAPTYPE, IMG_TYPE, path=path, img_width=IMG_WIDTH, img_height=IMG_HEIGHT)
+      fn = StaticMaps.get_satellite_img_filename(prefix, ZOOM, SCALE, MAPTYPE, IMG_TYPE, path=path, img_width=self.img_width, img_height=self.img_height)
+      
+      # if not pd.isna(row.OSMID):
+      #   path = self.path_pplaces_imgs
+      #   prefix = f"OSMID{int(row.OSMID)}-"
+      #   #fn = f"OSMID{int(row.OSMID)}-LA*-LO*-ZO{ZOOM}-SC{SCALE}-{IMG_WIDTH}x{IMG_HEIGHT}-{MAPTYPE}.{IMG_TYPE}"
+      # else:
+      #   path = self.path_clusters_imgs
+      #   prefix = f"Y{row.cluster_year}-C{row.cluster_number}-U{row.cluster_rural}-"
+      #   #fn = f"Y{row.dhs_year}-C{row.dhs_cluster}-U{row.dhs_rural+1}-LA*-LO*-ZO{ZOOM}-SC{SCALE}-{IMG_WIDTH}x{IMG_HEIGHT}-{MAPTYPE}.{IMG_TYPE}"
       
       fn_img = glob.glob(fn)
       
@@ -734,7 +751,7 @@ class Augmentation(object):
       if not self.exists_ntimes(fn, N_AUGMENTATIONS):
         flag = True
 
-        image = load_img(fn_img[0], target_size=(IMG_WIDTH, IMG_HEIGHT))
+        image = load_img(fn_img[0], target_size=(self.img_width, self.img_height))
         image = img_to_array(image, dtype='uint8')
         image = image[0:-PIXELS_LOGO,0:-PIXELS_LOGO,:]
         
@@ -756,7 +773,7 @@ class Augmentation(object):
         # Mixed: ccrop + gnoise + erase
         p = np.random.randint(20,50) / 100
         tmp = tf.image.central_crop(image, p)
-        tmp = tf.image.resize(tmp, size = [IMG_WIDTH-PIXELS_LOGO, IMG_HEIGHT-PIXELS_LOGO])
+        tmp = tf.image.resize(tmp, size = [self.img_width-PIXELS_LOGO, self.img_height-PIXELS_LOGO])
         tmp = tf.dtypes.cast(tmp, 'uint8')
         tmp = Augmentation.random_erasing(tmp, probability=1.0)
         stdev = np.random.randint(10,15) / 100
@@ -767,9 +784,8 @@ class Augmentation(object):
         
         # Mixed: rcrop + rfliplr + rflipud + gnoise
         p = np.random.randint(10,20)
-        tmp = tf.image.random_crop(image, size = [int(round((IMG_WIDTH-PIXELS_LOGO) * p/100,0)), 
-                                                  int(round((IMG_HEIGHT-PIXELS_LOGO) * p/100,0)), BANDS])
-        tmp = tf.image.resize(tmp, size = [IMG_WIDTH-PIXELS_LOGO, IMG_HEIGHT-PIXELS_LOGO])
+        tmp = tf.image.random_crop(image, size = [int(round((self.img_width-PIXELS_LOGO) * p/100,0)), int(round((self.img_height-PIXELS_LOGO) * p/100,0)), BANDS])
+        tmp = tf.image.resize(tmp, size = [self.img_width-PIXELS_LOGO, self.img_height-PIXELS_LOGO])
         tmp = tf.image.flip_up_down(tmp) if np.random.rand() > 0.5 else tmp
         tmp = tf.image.flip_left_right(tmp) if np.random.rand() > 0.5 else tmp
         tmp = tf.dtypes.cast(tmp, 'uint8')
@@ -780,7 +796,97 @@ class Augmentation(object):
         self.save_augmented_image(tmp, fn, f'rcrop{p}noise{int(stdev*100)}flips')
         
     return (row.cluster_id, flag)
-      
+
+  
+#     ### 18 augmentations (old/backup)
+    
+#     image = tf.image.resize(image, [IMG_WIDTH, IMG_HEIGHT], method='nearest') # not needed
+#     # flip up/down
+#     tmp = tf.image.flip_up_down(image)
+#     self.save_augmented_image(tmp, fn, 'flipUD')
+
+#     # flip left/rigth
+#     tmp = tf.image.flip_left_right(image)
+#     self.save_augmented_image(tmp, fn, 'flipLR')
+
+#     # rotation x5
+#     tmp = tfa.image.rotate(image, angles=0.785398, fill_mode = 'wrap', interpolation='nearest')
+#     self.save_augmented_image(tmp, fn, 'rot45')
+
+#     tmp = tfa.image.rotate(image, angles=1.5708, fill_mode = 'wrap', interpolation='nearest')
+#     self.save_augmented_image(tmp, fn, 'rot90')
+
+#     tmp = tfa.image.rotate(image, angles=3.14159, fill_mode = 'wrap', interpolation='nearest')
+#     self.save_augmented_image(tmp, fn, 'rot180') #eq. flip-UD (maybe remove)
+
+#     tmp = tfa.image.rotate(image, angles=4.71239, fill_mode = 'wrap', interpolation='nearest')
+#     self.save_augmented_image(tmp, fn, 'rot270') 
+
+#     angle = random.uniform(0.174533,6.10865) # 10 - 350
+#     tmp = tfa.image.rotate(image, angles=angle, fill_mode = 'wrap', interpolation='nearest')
+#     self.save_augmented_image(tmp, fn, 'rotrnd')
+
+#     # scale 
+#     s = 2 # MAYBE REMOVE
+#     tmp = skimage.transform.rescale(image, scale=s, mode='wrap',  anti_aliasing=True, clip=True)
+#     tmp = tf.image.random_crop(tmp, size = [IMG_WIDTH-PIXELS_LOGO, IMG_HEIGHT-PIXELS_LOGO, BANDS])
+#     self.save_augmented_image(tmp, fn, f'scale{s}')
+
+#     # central crop x2
+#     p = 20 # MAYBE REMOVE
+#     tmp = tf.image.central_crop(image, p/100)
+#     tmp = tf.image.resize(tmp, size = [IMG_WIDTH-PIXELS_LOGO, IMG_HEIGHT-PIXELS_LOGO], method='nearest', antialias=True, preserve_aspect_ratio=True)
+#     self.save_augmented_image(tmp, fn, f'ccrop{p}')
+
+#     p = 50
+#     tmp = tf.image.central_crop(image, p/100)
+#     tmp = tf.image.resize(tmp, size = [IMG_WIDTH-PIXELS_LOGO, IMG_HEIGHT-PIXELS_LOGO], method='nearest', antialias=True, preserve_aspect_ratio=True)
+#     self.save_augmented_image(tmp, fn, f'ccrop{p}')
+
+#     # random crop
+#     p = 20 # MAYBE REMOVE
+#     tmp = tf.image.random_crop(image, size = [int(round((IMG_WIDTH-PIXELS_LOGO) * p/100,0)), int(round((IMG_HEIGHT-PIXELS_LOGO) * p/100,0)), BANDS])
+#     tmp = tf.image.resize(tmp, size = [IMG_WIDTH-PIXELS_LOGO, IMG_HEIGHT-PIXELS_LOGO])
+#     self.save_augmented_image(tmp, fn, f'rcrop{p}')
+
+#     p = 50
+#     tmp = tf.image.random_crop(image, size = [int(round((IMG_WIDTH-PIXELS_LOGO) * p/100,0)), int(round((IMG_HEIGHT-PIXELS_LOGO) * p/100,0)), BANDS])
+#     tmp = tf.image.resize(tmp, size = [IMG_WIDTH-PIXELS_LOGO, IMG_HEIGHT-PIXELS_LOGO])
+#     self.save_augmented_image(tmp, fn, f'rcrop{p}')
+
+#     p = 80 # MAYBE REMOVE
+#     tmp = tf.image.random_crop(image, size = [int(round((IMG_WIDTH-PIXELS_LOGO) * p/100,0)), int(round((IMG_HEIGHT-PIXELS_LOGO) * p/100,0)), BANDS])
+#     tmp = tf.image.resize(tmp, size = [IMG_WIDTH-PIXELS_LOGO, IMG_HEIGHT-PIXELS_LOGO])
+#     self.save_augmented_image(tmp, fn, f'rcrop{p}')
+
+#     # Adding Gaussian noise
+#     gnoise = tf.random.normal(shape=tf.shape(image), mean=0.0, stddev=0.1, dtype=tf.float32)
+#     tmp = tf.image.convert_image_dtype(image, dtype=tf.float32, saturate=False)
+#     tmp = tf.add(tmp, gnoise)
+#     self.save_augmented_image(tmp, fn, 'noise')
+
+#     # Brightness
+#     p = 20
+#     tmp = tf.image.adjust_brightness(image, delta=p/100)
+#     self.save_augmented_image(tmp, fn, f'bright{p}')
+
+#     p = 20
+#     tmp = tf.image.adjust_brightness(image, delta=-p/100)
+#     self.save_augmented_image(tmp, fn, f'dark{p}')
+
+#     # Random erase
+#     tmp = Augmentation.random_erasing(image, 1)
+#     self.save_augmented_image(tmp, fn, f'rerase')
+
+#     # Mixed: rcrop20 + rfliplr + rflipud
+#     p = 20
+#     tmp = tf.image.random_crop(image, size = [int(round((IMG_WIDTH-PIXELS_LOGO) * p/100,0)), int(round((IMG_HEIGHT-PIXELS_LOGO) * p/100,0)), BANDS])
+#     tmp = tf.image.resize(tmp, size = [IMG_WIDTH-PIXELS_LOGO, IMG_HEIGHT-PIXELS_LOGO])
+#     tmp = tf.image.flip_up_down(image) if np.random.rand() > 0.5 else tmp
+#     tmp = tf.image.flip_left_right(image) if np.random.rand() > 0.5 else tmp
+#     self.save_augmented_image(tmp, fn, f'rcrop{p}flip')
+        
+        
   @staticmethod
   def random_erasing(img, probability = 0.5, sl = 0.02, sh = 0.4, r1 = 0.3):
     '''
@@ -831,6 +937,193 @@ class Augmentation(object):
     if type(image[0,0,0]) != np.uint8 and 'noise' in name: #name in ['scale2','noise']:
       image = image*255
 
-    plt.imsave(os.path.join(self.path_augmented_imgs,f"{fn}"),image.reshape(IMG_WIDTH-PIXELS_LOGO, 
-                                                                            IMG_HEIGHT-PIXELS_LOGO, BANDS).astype('uint8'))
+    plt.imsave(os.path.join(self.path_augmented_imgs,f"{fn}"),image.reshape(self.img_width-PIXELS_LOGO, self.img_height-PIXELS_LOGO, BANDS).astype('uint8'))
     plt.close()
+
+    
+        # def tunning_summary(self, duration):
+  #   if self.results_path:
+  #     print("--- %s secs tuning ---" % (duration))
+  #     self.best_params.update({'duration':duration,'best_score':self.best_score})
+  #     ios.save_csv(self.cv_results, fn=os.path.join(self.results_path,'hp_summary.csv'))
+  #     ios.save_json(self.best_params, fn=self.get_best_params_summary_fn())
+  
+  
+  # def flush(self):
+  #   del(self.session)
+  #   del(self.config)
+  #   del(self.model)
+  #   del(self.best_params)
+  #   del(self.best_score)
+  #   del(self.metrics)
+  #   del(self.history)
+  #   gc.collect()
+
+ # def needs_tuning(self):
+  #   self.best_params = ios.load_json(self.get_best_params_summary_fn(), verbose=True)
+  #   if self.best_params:
+  #     print("Best hyper-params loaded.")
+  #     self.lr = self.best_params['lr']
+  #     self.dropout = self.best_params['dropout']
+  #     self.optimizer_name = self.best_params['optimizer_name']
+      
+  #     try:
+  #       self.rotation = self.best_params['rotation']
+  #       self.contrast = self.best_params['contrast']
+  #       self.translation = self.best_params['translation']
+  #       self.zoom = self.best_params['zoom']
+  #       self.contrast_range = self.best_params['contrast_range']
+  #       self.brightness_delta = self.best_params['brightness_delta']
+  #     except:
+  #       self.rotation = None
+  #       self.contrast = None
+  #       self.translation = None
+  #       self.zoom = None
+  #       self.contrast_range = None
+  #       self.brightness_delta = None
+      
+  #     return False
+    
+  #   if self.lr is None or self.dropout is None or self.optimizer_name is None:
+  #     print("This run needs hyper-param tuning.")
+  #     return True
+  #   return False
+
+  # def progress_hyper_params_tuning_eval(self):
+  #   progress = defaultdict(lambda:defaultdict(lambda:defaultdict(lambda:0)))
+  #   if self.df_evaluation.shape[0] == 0:
+  #     return progress
+  #   else:
+  #     tmp = self.df_evaluation.groupby(['rs','run','fold']).size().reset_index(name='counts')
+  #     for id, row in tmp.iterrows():
+  #       progress[row.rs][row.run][row.fold] = row.counts
+  #   return progress
+
+  # def update_hyper_params_tuning_eval(results, epoch, fold, rs, hparams):
+  #   cols = None
+  #   if self.df_evaluation.shape[0] > 0:
+  #     cols = self.df_evaluation.columns
+
+  #   tmp = self.df_evaluation.query("run==@epoch and fold==@fold and rs==@rs")
+  #   if tmp.shape[0] > 0:
+  #     # update
+  #     for hyperparam,value in hparams.items():
+  #       self.df_evaluation.loc[tmp.index,hyperparam] = value
+  #     for metric,value in results.items()
+  #       self.df_evaluation.loc[tmp.index,metric] = value
+  #   else:
+  #     # new
+  #     obj = {'run':epoch, 'fold':fold, 'rs':rs}
+  #     obj.update(hparams)
+  #     obj.update(results)
+  #     if cols is None:
+  #       cols = ['run','fold','rs'] + list(hparams.keys()) + list(results.keys())
+
+  #     self.df_evaluation = self.df_evaluation.append(pd.DataFrame(obj, columns=cols), ignore_index=True)
+
+
+  # def __hyper_parameter_tuning(self, X_train, y_train, X_val, y_val, kfold=5):
+  #   # model: modelname, nclasses, pixels, bands, lr, dropout, rotation=0.2, contrast=0.9, translation=0.2, zoom=0.6
+
+  #   # hyper-params
+  #   lrs = [1e-2, 1e-3, 1e-4, 1e-5] #1e-1, 3e-1, 5e-2, 3e-2, 
+  #   optimizer_names = CNN_TUNING_OPTIMIZERS
+  #   dropouts = [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9]
+    
+  #   if self.model_name.startswith("aug_"):
+  #     # online augmentation
+  #     rotations = [0.1,0.2,0.3,0.4,0.5]
+  #     contrasts = [0.1,0.2,0.3,0.4,0.5,0.6,0.7,0.8,0.9]
+  #     translations = [0.1,0.2,0.3,0.4,0.5,0.6,0.7,0.8,0.9]
+  #     zooms = [0.1,0.2,0.3,0.4,0.5,0.6,0.7,0.8,0.9]
+  #     contrast_ranges = [[0.5, 0.6], [0.6,0.7], [0.7,0.8], [0.8,0.9],[0.9,1.0],[1.0,2.0]]
+  #     brightness_deltas = [[-0.3,-0.2],[-0.2,-0.1],[-0.1,0.0],[0.0,0.1],[0.1,0.2]]
+
+  #     params = dict(modelname=[self.model_name],
+  #                   nclasses=[self.n_classes],
+  #                   pixels=[self.pixels],
+  #                   bands=[self.bands],
+  #                   lr=lrs, 
+  #                   dropout=dropouts,
+  #                   optimizer_name=optimizer_names,
+  #                   rotation=rotations,
+  #                   contrast=contrasts,
+  #                   translation=translations,
+  #                   zoom=zooms,
+  #                   contrast_range=contrast_ranges,
+  #                   brightness_delta=brightness_deltas)
+  #   else:
+  #     print("Hypter-param does not include augmentation.")
+  #     params = dict(modelname=[self.model_name],
+  #                   nclasses=[self.n_classes],
+  #                   pixels=[self.pixels],
+  #                   bands=[self.bands],
+  #                   lr=lrs, 
+  #                   dropout=dropouts,
+  #                   optimizer_name=optimizer_names)
+    
+  #   combinations = np.prod([len(v) for v in params.values()])
+  #   print("- All possible combinations hyper-params: ", combinations)
+  #   n_iter = min(CNN_TUNING_ITER,int(round(combinations/2)))
+  #   print("- # random candidates: ", n_iter)
+    
+  #   # model
+  #   model = models.get_Keras_model(self.model_name)(build_fn=models.define_model, epochs=CNN_TUNING_EPOCHS, batch_size=self.batch_size, verbose=1)
+    
+  #   # randomsearch
+  #   randm_src = RandomizedSearchCV(estimator=model, 
+  #                                  scoring = CNN_REG_SCORING if self.isregression else CNN_CLASS_SCORING,
+  #                                  param_distributions = params, 
+  #                                  cv = KFold(kfold),
+  #                                  n_iter = n_iter,
+  #                                  pre_dispatch=1,
+  #                                  n_jobs=1,
+  #                                  refit=False,
+  #                                  verbose = 20)
+    
+  #   # Fit
+  #   X = np.append(X_train, X_val, axis=0)
+  #   y = np.append(y_train, y_val, axis=0)
+  #   result = randm_src.fit(X, y)
+  #   K.clear_session()
+    
+  #   print(" Results from Random Search " )
+  #   #print("\n The best estimator across ALL searched params:\n", randm_src.best_estimator_) # commented when refit is False
+  #   print("\n The best score across ALL searched params:\n", randm_src.best_score_)
+  #   print("\n The best parameters across ALL searched params:\n", randm_src.best_params_)
+  #   self.cv_results = pd.DataFrame.from_dict(result.cv_results_)
+    
+  #   # best hyper-params
+  #   self.best_params = randm_src.best_params_
+  #   self.best_score = randm_src.best_score_
+  #   self.lr = self.best_params['lr']
+  #   self.dropout = self.best_params['dropout']
+  #   self.optimizer_name = self.best_params['optimizer_name']
+    
+  #   try:
+  #     self.rotation = self.best_params['rotation']
+  #     self.contrast = self.best_params['contrast']
+  #     self.translation = self.best_params['translation']
+  #     self.zoom = self.best_params['zoom']
+  #     self.contrast_range = self.best_params['contrast_range']
+  #     self.brightness_delta = self.best_params['brightness_delta']
+  #   except:
+  #     self.rotation = None
+  #     self.contrast = None
+  #     self.translation = None
+  #     self.zoom = None
+  #     self.contrast_range = None
+  #     self.brightness_delta = None
+      
+  #   # flush
+  #   del(X)
+  #   del(y)
+  #   del(result.cv_results_)
+  #   del(result)
+  #   del(model)
+  #   del(randm_src.best_params_)
+  #   del(randm_src.best_score_)
+  #   # del(randm_src.best_estimator_)
+  #   del(params)
+  #   gc.collect()
+  #   time.sleep(1)

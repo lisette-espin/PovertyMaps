@@ -15,12 +15,12 @@ from utils import validations
 # Functions
 ###############################################################################
 
-def run(root, years, dhsloc, njobs=1, probaug=None):
+def run(root, years, dhsloc, njobs=1, probaug=None, img_width=None, img_height=None):
   # validation
   validations.validate_not_empty(root,'root')
   
   # data
-  aug = Augmentation(root, years, dhsloc, probaug)
+  aug = Augmentation(root, years, dhsloc, probaug, img_width, img_height)
   aug.load_data()
   aug.generate(njobs)
       
@@ -35,6 +35,8 @@ if __name__ == "__main__":
   parser.add_argument("-dhsloc", help="DHS cluster option (None, cc, ccur, gc, gcur, rc).", type=str, default=None, required=False)
   parser.add_argument("-probaug", help="Probability of augmentation (0, .., 1] ", type=float, required=False, default=None)
   parser.add_argument("-njobs", help="Number of parallel processes.", type=int, required=False, default=1)
+  parser.add_argument("-imgwidth", help="Image width", type=int, default=None)
+  parser.add_argument("-imgheight", help="Image width", type=int, default=None)
   parser.add_argument("-shutdown", help="Python script that shutsdown the server after training.", type=str, default=None, required=False)
     
   args = parser.parse_args()
@@ -43,7 +45,7 @@ if __name__ == "__main__":
 
   start_time = time.time()
   try:
-    run(args.r, args.years, args.dhsloc, args.njobs, args.probaug)
+    run(args.r, args.years, args.dhsloc, args.njobs, args.probaug, args.imgwidth, args.imgheight)
   except Exception as ex:
     print(ex)
   print("--- %s seconds ---" % (time.time() - start_time))

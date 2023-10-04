@@ -244,13 +244,10 @@ def distances_rc(gdf_cluster_m, gdf_pplaces_m, only_rural=True):
               pplaces_in_radius.loc[:,f"std_{WEALTH}"] = row[f"std_{WEALTH}"]
               pplaces_in_radius.loc[:,'distance'] = pplaces_in_radius.geometry.distance(row.geometry)
               tmp_distances = tmp_distances.append(pplaces_in_radius[tmpcols], ignore_index=True)
-
-        # from 1 to farest
-        tmp = tmp_distances.groupby('cluster_id').size().reset_index().rename(columns={0:'pplaces'}).sort_values('pplaces', ascending=True) 
         
+        tmp = tmp_distances.groupby('cluster_id').size().reset_index().rename(columns={0:'pplaces'}).sort_values('pplaces', ascending=True) # from 1 to farest
         for i,row in tmp.iterrows():
-          # from closest to farest
-          targets = tmp_distances.query("cluster_id=='{}'".format(row.cluster_id)).sort_values('distance', ascending=True) 
+          targets = tmp_distances.query("cluster_id=='{}'".format(row.cluster_id)).sort_values('distance', ascending=True) # from closest to farest
 
           counter = 0 
           for j,target in targets.iterrows(): 
@@ -269,9 +266,7 @@ def distances_rc(gdf_cluster_m, gdf_pplaces_m, only_rural=True):
             gdf_nearest_rural.loc[:,f"std_{WEALTH}"] = target[f"std_{WEALTH}"]
             gdf_nearest_rural.loc[:,'pplace_cluster_distance'] = target.distance
             gdf_nearest_rural.rename(columns={RURAL:'pplace_rural'}, inplace=True)
-            gdf_nearest_rural.drop(columns=[c for c in gdf_nearest_rural.columns if not c.startswith('cluster') 
-                                            and not c.startswith('pplace') and not c.startswith(OSMID) and not c.startswith("mean_") 
-                                            and not c.startswith("std_")], inplace=True)
+            gdf_nearest_rural.drop(columns=[c for c in gdf_nearest_rural.columns if not c.startswith('cluster') and not c.startswith('pplace') and not c.startswith(OSMID) and not c.startswith("mean_") and not c.startswith("std_")], inplace=True)
             
             # concatenate results
             gdf_nearest_rural = gdf_nearest_rural[DISTCOLS]
@@ -347,6 +342,15 @@ def validate_extras(df):
 
 
 def groupby(gdf_cluster_m, gdf_pplaces_m, df_valid, option):
+  # @DEPRECATED
+  # if option in ['gc','gcur']:
+  #   gdf_cluster_m_new = df_valid.groupby(['OSMID','dhs_rural','pplace_rural'],dropna=False)[['dhs_mean_iwi','dhs_std_iwi','pplace_cluster_distance']].mean().reset_index()
+  #   gdf_cluster_m_new.loc[:,'dhs_id'] = None
+  #   gdf_cluster_m_new.loc[:,'dhs_rural'] = None
+  #   gdf_cluster_m_new.loc[:,'dhs_year'] = None
+  #   gdf_cluster_m_new.loc[:,'dhs_cluster'] = None
+  # else:
+  
   cols = [c for c in DISTCOLS if c not in [f"mean_{WEALTH}",f"std_{WEALTH}"] ]
   df_valid.loc[:,f"mean_{WEALTH}"] = df_valid.loc[:,f"mean_{WEALTH}"].astype(np.float16)
   df_valid.loc[:,f"std_{WEALTH}"] = df_valid.loc[:,f"std_{WEALTH}"].astype(np.float16)
@@ -368,8 +372,170 @@ def restrict_displacement(df_results):
   print(query)
   within = df_results.query(query).copy()
   
+  #tmp = df_results.query("(cluster_rural==0 & pplace_cluster_distance>{}) or (cluster_rural==1 & pplace_cluster_distance>{})".format(DISPLACEMENT_M[0]+EXTRA[0], DISPLACEMENT_M[1]+EXTRA[1]))
+  # within = df_results.query("(cluster_rural==0 & pplace_cluster_distance<={}) or (cluster_rural==1 & pplace_cluster_distance<={})".format(DISPLACEMENT_M[0]+EXTRA[0],DISPLACEMENT_M[1]+EXTRA[1])).copy()
+  
   print('df_results',df_results.shape)
   print('within',within.shape)
   
   return within
 
+
+#########################################################################################################
+# DEPRECATED: using dhs nomenclature (not unified one)
+#########################################################################################################
+# def distances_cc(gdf_cluster_m, gdf_pplaces_m):
+#   df_results = pd.DataFrame(columns=DISTCOLS)
+
+#   for k,v in DISPLACEMENT_M.items():
+#     print("\n\n{}:{}".format(k,'RURAL' if k else 'URBAN'))
+
+#     for y in sorted(gdf_cluster_m.DHSYEAR.unique(), reverse=True):
+#       print("year:{}".format(y))
+
+#       gdf_cluster_rural = gdf_cluster_m.query('rural==@k & DHSYEAR==@y')
+#       gdf_pplaces_rural = gdf_pplaces_m.copy()
+      
+#       print('cluster: ', gdf_cluster_m.shape, gdf_cluster_rural.shape)
+#       print('pplaces: ', gdf_pplaces_m.shape, gdf_pplaces_rural.shape)
+        
+#       while True: 
+        
+#         # remove those who already found a match
+#         if df_results.shape[0] > 0:
+#           gdf_cluster_rural = gdf_cluster_rural[~gdf_cluster_rural.DHSID.isin(df_results.dhs_id.values)]
+#           gdf_pplaces_rural = gdf_pplaces_rural[~gdf_pplaces_rural.OSMID.isin(df_results.OSMID.values)]
+        
+#         if gdf_cluster_rural.shape[0]==0 or gdf_pplaces_rural.shape[0]==0:
+#           break
+
+#         gdf_nearest_rural, dist_rural = geo.fast_find_nearest_per_record(gdf_cluster_rural,gdf_pplaces_rural) #original_index (index from gdf_pplaces_rural)
+#         gdf_nearest_rural.loc[:,'dhs_id'] = gdf_cluster_rural.DHSID.values
+#         gdf_nearest_rural.loc[:,'dhs_year'] = gdf_cluster_rural.DHSYEAR.values
+#         gdf_nearest_rural.loc[:,'dhs_cluster'] = gdf_cluster_rural.DHSCLUST.values
+#         gdf_nearest_rural.loc[:,'dhs_rural'] = gdf_cluster_rural.rural.values
+#         gdf_nearest_rural.loc[:,'dhs_mean_iwi'] = gdf_cluster_rural.mean_iwi.values
+#         gdf_nearest_rural.loc[:,'dhs_std_iwi'] = gdf_cluster_rural.std_iwi.values
+#         gdf_nearest_rural.loc[:,'pplace_cluster_distance'] = dist_rural
+#         gdf_nearest_rural.drop(columns=['lat','lon','loc_name','name','type','place','population','capital','is_capital','admin_level','GNS:dsg_code','original_index'], inplace=True)
+#         gdf_nearest_rural.rename(columns={'rural':'pplace_rural'}, inplace=True)
+
+#         gdf_nearest_rural = gdf_nearest_rural[DISTCOLS]
+#         df_results = df_results.append(gdf_nearest_rural.sort_values('pplace_cluster_distance').drop_duplicates('OSMID',keep='first'), ignore_index=True)
+#         print('results (pplaces)', df_results.shape)
+  
+#   return df_results,None
+
+# def distances_ccur(gdf_cluster_m, gdf_pplaces_m):
+#   df_results = pd.DataFrame(columns=DISTCOLS)
+
+#   for k,v in DISPLACEMENT_M.items():
+#     print("\n\n{}:{}".format(k,'RURAL' if k else 'URBAN'))
+
+#     for y in sorted(gdf_cluster_m.DHSYEAR.unique(), reverse=True):
+#       print("year:{}".format(y))
+
+#       gdf_cluster_rural = gdf_cluster_m.query('rural==@k & DHSYEAR==@y')
+#       gdf_pplaces_rural = gdf_pplaces_m.query("rural==@k")
+      
+#       print('cluster: ', gdf_cluster_m.shape, gdf_cluster_rural.shape)
+#       print('pplaces: ', gdf_pplaces_m.shape, gdf_pplaces_rural.shape)
+        
+#       while True: 
+        
+#         # remove those who already found a match
+#         if df_results.shape[0] > 0:
+#           gdf_cluster_rural = gdf_cluster_rural[~gdf_cluster_rural.DHSID.isin(df_results.dhs_id.values)]
+#           gdf_pplaces_rural = gdf_pplaces_rural[~gdf_pplaces_rural.OSMID.isin(df_results.OSMID.values)]
+        
+#         if gdf_cluster_rural.shape[0]==0 or gdf_pplaces_rural.shape[0]==0:
+#           break
+
+#         gdf_nearest_rural, dist_rural = geo.fast_find_nearest_per_record(gdf_cluster_rural,gdf_pplaces_rural) #original_index (index from gdf_pplaces_rural)
+#         gdf_nearest_rural.loc[:,'dhs_id'] = gdf_cluster_rural.DHSID.values
+#         gdf_nearest_rural.loc[:,'dhs_year'] = gdf_cluster_rural.DHSYEAR.values
+#         gdf_nearest_rural.loc[:,'dhs_cluster'] = gdf_cluster_rural.DHSCLUST.values
+#         gdf_nearest_rural.loc[:,'dhs_rural'] = gdf_cluster_rural.rural.values
+#         gdf_nearest_rural.loc[:,'dhs_mean_iwi'] = gdf_cluster_rural.mean_iwi.values
+#         gdf_nearest_rural.loc[:,'dhs_std_iwi'] = gdf_cluster_rural.std_iwi.values
+#         gdf_nearest_rural.loc[:,'pplace_cluster_distance'] = dist_rural
+#         gdf_nearest_rural.drop(columns=['lat','lon','loc_name','name','type','place','population','capital','is_capital','admin_level','GNS:dsg_code','original_index'], inplace=True)
+#         gdf_nearest_rural.rename(columns={'rural':'pplace_rural'}, inplace=True)
+
+#         gdf_nearest_rural = gdf_nearest_rural[DISTCOLS]
+#         df_results = df_results.append(gdf_nearest_rural.sort_values('pplace_cluster_distance').drop_duplicates('OSMID',keep='first'), ignore_index=True)
+#         print('results (pplaces)', df_results.shape)
+  
+#   return df_results,None
+
+# def distances_gc(gdf_cluster_m, gdf_pplaces_m):
+#   df_results = pd.DataFrame(columns=DISTCOLS)
+
+#   for k,v in DISPLACEMENT_M.items():
+#     print("\n\n{}:{}".format(k,LABEL[k]))
+
+#     for y in sorted(gdf_cluster_m.DHSYEAR.unique(), reverse=True):
+#       print("year:{}".format(y))
+      
+#       gdf_cluster_rural = gdf_cluster_m.query('rural==@k & DHSYEAR==@y').copy()
+#       gdf_pplaces_rural = gdf_pplaces_m.copy()
+    
+#       # remove those who already found a match
+#       if df_results.shape[0] > 0:
+#         gdf_pplaces_rural = gdf_pplaces_rural[~gdf_pplaces_rural.OSMID.isin(df_results.OSMID.values)]
+    
+#       print('cluster: ', gdf_cluster_m.shape, gdf_cluster_rural.shape)
+#       print('pplaces: ', gdf_pplaces_m.shape, gdf_pplaces_rural.shape)
+      
+#       gdf_nearest_rural, dist_rural = geo.fast_find_nearest_per_record(gdf_cluster_rural,gdf_pplaces_rural) #original_index (index from gdf_pplaces_rural)
+#       gdf_nearest_rural.loc[:,'dhs_id'] = gdf_cluster_rural.DHSID.values
+#       gdf_nearest_rural.loc[:,'dhs_year'] = gdf_cluster_rural.DHSYEAR.values
+#       gdf_nearest_rural.loc[:,'dhs_cluster'] = gdf_cluster_rural.DHSCLUST.values
+#       gdf_nearest_rural.loc[:,'dhs_rural'] = gdf_cluster_rural.rural.values
+#       gdf_nearest_rural.loc[:,'dhs_mean_iwi'] = gdf_cluster_rural.mean_iwi.values
+#       gdf_nearest_rural.loc[:,'dhs_std_iwi'] = gdf_cluster_rural.std_iwi.values
+#       gdf_nearest_rural.loc[:,'pplace_cluster_distance'] = dist_rural
+#       gdf_nearest_rural.drop(columns=['lat','lon','loc_name','name','type','place','population','capital','is_capital','admin_level','GNS:dsg_code','original_index'], inplace=True)
+#       gdf_nearest_rural.rename(columns={'rural':'pplace_rural'}, inplace=True)
+      
+#       gdf_nearest_rural = gdf_nearest_rural[DISTCOLS]
+#       df_results = df_results.append(gdf_nearest_rural, ignore_index=True)
+#       print('results (pplaces)', df_results.shape)
+
+#   return df_results,None
+
+# def distances_gcur(gdf_cluster_m, gdf_pplaces_m):
+#   df_results = pd.DataFrame(columns=DISTCOLS)
+
+#   for k,v in DISPLACEMENT_M.items():
+#     print("\n\n{}:{}".format(k,LABEL[k]))
+
+#     for y in sorted(gdf_cluster_m.DHSYEAR.unique(), reverse=True):
+#       print("year:{}".format(y))
+      
+#       gdf_cluster_rural = gdf_cluster_m.query('rural==@k & DHSYEAR==@y')
+#       gdf_pplaces_rural = gdf_pplaces_m.query("rural==@k")
+    
+#       # remove those who already found a match
+#       if df_results.shape[0] > 0:
+#         gdf_pplaces_rural = gdf_pplaces_rural[~gdf_pplaces_rural.OSMID.isin(df_results.OSMID.values)]
+    
+#       print('cluster: ', gdf_cluster_m.shape, gdf_cluster_rural.shape)
+#       print('pplaces: ', gdf_pplaces_m.shape, gdf_pplaces_rural.shape)
+      
+#       gdf_nearest_rural, dist_rural = geo.fast_find_nearest_per_record(gdf_cluster_rural,gdf_pplaces_rural) #original_index (index from gdf_pplaces_rural)
+#       gdf_nearest_rural.loc[:,'dhs_id'] = gdf_cluster_rural.DHSID.values
+#       gdf_nearest_rural.loc[:,'dhs_year'] = gdf_cluster_rural.DHSYEAR.values
+#       gdf_nearest_rural.loc[:,'dhs_cluster'] = gdf_cluster_rural.DHSCLUST.values
+#       gdf_nearest_rural.loc[:,'dhs_rural'] = gdf_cluster_rural.rural.values
+#       gdf_nearest_rural.loc[:,'dhs_mean_iwi'] = gdf_cluster_rural.mean_iwi.values
+#       gdf_nearest_rural.loc[:,'dhs_std_iwi'] = gdf_cluster_rural.std_iwi.values
+#       gdf_nearest_rural.loc[:,'pplace_cluster_distance'] = dist_rural
+#       gdf_nearest_rural.drop(columns=['lat','lon','loc_name','name','type','place','population','capital','is_capital','admin_level','GNS:dsg_code','original_index'], inplace=True)
+#       gdf_nearest_rural.rename(columns={'rural':'pplace_rural'}, inplace=True)
+      
+#       gdf_nearest_rural = gdf_nearest_rural[DISTCOLS]
+#       df_results = df_results.append(gdf_nearest_rural, ignore_index=True)
+#       print('results (pplaces)', df_results.shape)
+
+#   return df_results,None

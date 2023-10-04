@@ -116,9 +116,15 @@ class StaticMaps(object):
       raise Exception("More than 1 image for the same cluster and settings.")
 
     if len(files) == 0:
-      fn = StaticMaps.get_satellite_img_filename(prefix, self.zoom, self.scale, self.maptype, 
-                                                 self.img_type, path=path, img_size=self.img_size, lat=self.lat, lon=self.lon)
+      fn = StaticMaps.get_satellite_img_filename(prefix, self.zoom, self.scale, self.maptype, self.img_type, path=path, img_size=self.img_size, lat=self.lat, lon=self.lon)
       files = [fn]
+      # fn = "{}LA{}-LO{}-ZO{}-SC{}-{}-{}.png".format('' if prefix is None else '{}-'.format(prefix),
+      #                                               round(self.lat,10),
+      #                                               round(self.lon,10),
+      #                                               self.zoom, self.scale, 
+      #                                               self.img_size, self.maptype)
+      #files = [os.path.join(path, fn)]
+      
       
     return files[0]
 
@@ -144,8 +150,7 @@ class StaticMaps(object):
     raise Exception(f"[ERROR] staticmaps.py | get_prefix | prefix could not be built")
     
   @staticmethod
-  def get_satellite_img_filename(prefix, zoom, scale, maptype, img_type, path=None, img_size=None, 
-                                 img_width=None, img_height=None, lat='*', lon='*'):
+  def get_satellite_img_filename(prefix, zoom, scale, maptype, img_type, path=None, img_size=None, img_width=None, img_height=None, lat='*', lon='*'):
     if img_size is None and img_width is None and img_height is None:
       raise Exception("[ERROR] staticmaps.py | get_satellite_img_filename | cannot be None when img_width and img_height are also None.")
       

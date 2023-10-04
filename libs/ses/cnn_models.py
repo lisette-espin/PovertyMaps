@@ -1,7 +1,3 @@
-################################################################################
-# Dependencies
-################################################################################
-
 import sys
 from tensorflow.keras.models import Sequential 
 from tensorflow.keras.backend import set_image_data_format 
@@ -21,14 +17,9 @@ from tensorflow.keras.regularizers import l1_l2
 from utils.constants import *
 from utils.augmentation import RandomColorDistortion #CutMix, MixUp, MosaicMix, FMix, 
 
-################################################################################
-# Functions
-################################################################################
-
 def load_existing_model(fn):
   K.clear_session()
-  model = load_model(fn, custom_objects={'RandomColorDistortion':RandomColorDistortion()}) 
-  # 'R2':R2(name='R2'), # r2 does not work when predictig both mean and std
+  model = load_model(fn, custom_objects={'RandomColorDistortion':RandomColorDistortion()}) # 'R2':R2(name='R2'), # r2 does not work when predictig both mean and std
   #model.summary()
   return model
 
@@ -275,3 +266,11 @@ def model_cnn_mp_dp_relu_sigmoid_adam_mean_std_regression(params):
   opt = _get_optimizer(params['optimizer_name'])(learning_rate=params['lr'])
   model.compile(optimizer=opt, loss=LOSS_REGRESSION, metrics=METRICS_REGRESSION)
   return model
+
+
+# def get_Keras_model(modelname):
+#   if modelname.endswith('_regression') or modelname in ['aug_cnn_mp_dp_relu_sigmoid_adam_mean_regression', 'aug_cnn_mp_dp_relu_sigmoid_adam_mean_std_regression']:
+#     print('Regressor')
+#     return KerasRegressor
+#   print('Classifier')
+#   return KerasClassifier

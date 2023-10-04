@@ -157,3 +157,19 @@ class R2(Metric):
       base_config = super().get_config()
       return {**base_config, **config}
     
+    
+# class R2(Metric):
+#   def __init__(self, name="r2", **kwargs):
+#       super(R2, self).__init__(name=name, dtype=tf.float32, y_shape=(1,), **kwargs)
+      
+#   def update_state(self, y_true, y_pred, sample_weight=None):
+#     metric = tfa.metrics.r_square.RSquare(name='r2', dtype=tf.float32, y_shape=(1,))
+#     metric.update_state(y_true, y_pred)
+#     result = metric.result()
+#     self.r2 = result #result.numpy()
+
+#   def result(self):
+#       return self.r2
+
+#   def reset_state(self):
+#       self.r2 = None  

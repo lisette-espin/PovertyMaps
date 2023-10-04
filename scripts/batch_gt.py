@@ -24,7 +24,6 @@ def get_instance(root, code, years, **kwargs):
   if code in ['EC']:
     return ENEMDU(root,code, years, **kwargs)
   if code in ['HU']:
-    validations.validate_grid_size(**kwargs)
     return INGATLAN(root,code, years, **kwargs)
   raise Exception("code does not exist.")
 
@@ -38,7 +37,7 @@ def run(root, code, years, njobs=1, **kwargs):
   country.load_data()
 
   print("\n2. Computing wealth per household and cluster...")
-  country.commpute_indicators(njobs)
+  country.compute_indicators(njobs)
   country.rename_columns()
 
   print("----- survey/points -----")
@@ -61,7 +60,7 @@ def run(root, code, years, njobs=1, **kwargs):
   save_results(root, country)
 
 def save_results(root, country):
-  prefix = ios.get_prefix_surveys(country.df_survey)
+  prefix = ios.get_prefix_surveys(country.df_survey if country.df_survey.shape[0]>0 else country.df_cluster)
   print(prefix)
 
   # household wealth

@@ -32,7 +32,7 @@ from utils.constants import *
 # Functions
 ###############################################################################
 
-def run(root, years,  model_name, y_attribute, dhsloc, traintype, fm_layer=20, njobs=1, offaug=False, specific_run=None):
+def run(root, years,  model_name, y_attribute, dhsloc, traintype, fm_layer=20, njobs=1, offaug=False, specific_run=None, img_width=None, img_height=None):
   # validation
   validations.validate_not_empty(root,'root')
   
@@ -43,8 +43,11 @@ def run(root, years,  model_name, y_attribute, dhsloc, traintype, fm_layer=20, n
     print(f"DHSLOC: {dhsloc} does not exist.")
     raise Exception("DHSLOC does not exist.")
   
+  # @TODO incorporate pplaces
+  
   ### 1. data
-  data = Data(root=root, years=years, dhsloc=dhsloc, traintype=traintype, model_name=model_name, offaug=offaug, isregression=isregression)
+  data = Data(root=root, years=years, dhsloc=dhsloc, traintype=traintype, 
+              model_name=model_name, offaug=offaug, isregression=isregression, img_width=img_width, img_height=img_height)
   data.set_nclasses(y_attribute)
   
   ### 2. for each independent run and fold extract feaure map from train and val
@@ -60,6 +63,9 @@ def run(root, years,  model_name, y_attribute, dhsloc, traintype, fm_layer=20, n
     X_val, y_val = data.cnn_get_X_y(val, y_attribute)
     pixels = X_train.shape[1]
     bands  = X_train.shape[3]
+  
+    print(f'pixels: {pixels} - bands: {bands}')
+    print(f"path: {path}")
     
     # 2.2. load CNN model
     ses = SESImages(root=root, runid=runid, n_classes=data.n_classes, model_name=model_name,
@@ -108,6 +114,8 @@ def run(root, years,  model_name, y_attribute, dhsloc, traintype, fm_layer=20, n
                     pixels=pixels, bands=bands, isregression=isregression, rs=rs, offaug=offaug)
     ses.init(path)
     ses.load_model()
+    
+    # @TODO: this train below contains vals.... this should not be like this, if the final model is trained on train only without val ?
     
     # 3.3 train feature maps
     # if offaug, then it is stored with data offline data aug
@@ -175,6 +183,8 @@ if __name__ == "__main__":
   parser.add_argument("-njobs", help="Parallel processes.", type=int, default=1)
   parser.add_argument("-offaug", help="Whether or not to use model with offline augmented images.", action='store_true')
   parser.add_argument("-runid", help="Runid to focus on (so this script can be run in parallel)", type=int, default=None)
+  parser.add_argument("-imgwidth", help="Image width", type=int, default=None)
+  parser.add_argument("-imgheight", help="Image width", type=int, default=None)
   parser.add_argument("-shutdown", help="Python script that shutsdown the server after training.", type=str, default=None, required=False)
   
   args = parser.parse_args()
@@ -183,7 +193,7 @@ if __name__ == "__main__":
 
   start_time = time.time()
   try:
-    run(args.r, args.years, args.model, args.yatt, args.dhsloc, args.traintype, args.fmlayer, args.njobs, args.offaug, args.runid)
+    run(args.r, args.years, args.model, args.yatt, args.dhsloc, args.traintype, args.fmlayer, args.njobs, args.offaug, args.runid, args.imgwidth, args.imgheight)
   except Exception as ex:
     print(ex)
   

@@ -9,6 +9,7 @@
 ################################################################################
 
 import os
+import glob
 import time
 import datetime
 import pandas as pd
@@ -61,9 +62,7 @@ class FacebookMarketing(object):
   BEHAVIOR_RETURNED_TRAVEL_1WEEK = {'behaviors':[{'id':6008261969983, 'name':'Returned from travels 1 week ago'}]}
   ### LIFE-EVENTS
   LIFEEVENT_AWAY_FROM_HOME = {'life_events':[{'id':6003053860372, 'name':'Away from hometown'},{'id':6003053857372, 'name':'Away from family'}]}
-  LIFEEVENT_ENGAGED = {'life_events':[{'id':6002714398772, 'name':'Newly-engaged (6 months)'},
-                                      {'id':6003050210972, 'name':'Newly engaged (1 year)'},
-                                      {'id':6012631862383,'name':'Newly engaged (3 months)'}]}
+  LIFEEVENT_ENGAGED = {'life_events':[{'id':6002714398772, 'name':'Newly-engaged (6 months)'},{'id':6003050210972, 'name':'Newly engaged (1 year)'},{'id':6012631862383,'name':'Newly engaged (3 months)'}]}
   ### INDUSTRY
   INDUSTRY_GOV = {'industries':[{'id':6019621029983, 'name':'Government Employees (Global)'}]}
   INDUSTRY_BUSINESS = {'industries':[{'id':6009003307783, 'name':'Business and Finance'}]}
@@ -124,12 +123,11 @@ class FacebookMarketing(object):
       pass
       #print(f'NEEDS TO BE QUERY: {len(results)}')
     else:
-      print(f"status: {status}")
+      ios.printf(f"status: {status}")
       raise Exception("[ERROR] marketing.py | extract_reach_estimate | something went wrong (status).")
       
     fields = []
-    params = {'targeting_spec': {'geo_locations':{'custom_locations':[{'latitude': lat, 'longitude': lon, 
-                                                                       'radius': radius, 'distance_unit': unit}], 
+    params = {'targeting_spec': {'geo_locations':{'custom_locations':[{'latitude': lat, 'longitude': lon, 'radius': radius, 'distance_unit': unit}], 
                                                   "location_types":["home"]},
                                  'age_min':13,'age_max':65},
               'appsecret_proof': self.appsecret_proof,
@@ -147,13 +145,13 @@ class FacebookMarketing(object):
       #code:100  subcode:1487851 (wrong location)
       #code:80004 subcode:2446079 (quota)
       code = FBM_SKIP_LOC if fex.api_error_code() == FBM_ERR_CODE_WRONG_LOC and fex.api_error_subcode() == FBM_ERR_SUBCODE_WRONG_LOC else FBM_QUOTA
-      print('[get_reach_estimate]',fex.api_error_code(), fex.api_error_subcode(), fex.get_message())
+      ios.printf(f"[get_reach_estimate] {fex.api_error_code()} {fex.api_error_subcode()} {fex.get_message()}")
       print('')
       result = None
 
     if result is not None:
       if len(result) > 1:
-        print(id)
+        ios.printf(id)
         raise Exception("This should not happen, or?")
     
       result = result[0]
@@ -193,9 +191,9 @@ class FacebookMarketing(object):
                 print(r)
       df_targeting_categories = df_targeting_categories.append({'id':id,'name':name,'description':description,'ttype':ttype,'platform':platform,'audience_size':audience_size}, ignore_index=True)
       if verbose:
-          print("id:{:15s}\t name:{:70s}\t description:{:150s}\t audience_size:{:10d}\t platform:{:15s}\t type:{}".format(r['id'], r['name'],r['description'],r['audience_size'],r['type']))
+          ios.printf("id:{:15s}\t name:{:70s}\t description:{:150s}\t audience_size:{:10d}\t platform:{:15s}\t type:{}".format(r['id'], r['name'],r['description'],r['audience_size'],r['type']))
     if verbose:
-      print(len(all_categories), df_targeting_categories.shape)
+      ios.printf(f"{len(all_categories)}  {df_targeting_categories.shape}")
     return df_targeting_categories
   
   def get_radius_suggestion(self, lon, lat, unit):
@@ -256,13 +254,16 @@ class FacebookMarketing(object):
 
   @staticmethod
   def load_tokens(tokens_dir):
-    files = [fn for fn in os.listdir(tokens_dir) if fn.endswith(".json") or os.path.isfile(os.path.join(tokens_dir,fn))]
+    files = sorted([os.path.join(d,fn) for d in glob.glob(tokens_dir) for fn in os.listdir(d) if fn.startswith('tokens-') and fn.endswith('.json')])
+    ios.printf(f"{len(files)} tokens loaded")
+    # files = sorted([fn for fn in os.listdir(tokens_dir) if fn.endswith(".json") or os.path.isfile(os.path.join(tokens_dir,fn))])
+
     tokens = {}
     for id, fn in enumerate(files):
-      fn = os.path.join(tokens_dir,fn)
+      #fn = os.path.join(tokens_dir,fn)
       try:
         obj = ios.load_json(fn)
-        if obj is not None:
+        if obj is not None:          
           tokens[id+1] = obj
       except Exception as ex:
         print(ex)
@@ -270,12 +271,16 @@ class FacebookMarketing(object):
     return tokens
 
   @staticmethod
-  def query(df_places, profiles, radius, unit, id, lat, lon, ccode, tokens, cache_dir, fn=None):
+  def query(df_places, profiles, radius, unit, id, lat, lon, ccode, tokens_dir, cache_dir, fn=None):
   
-    tstart, tmax = reset_start_max_quota_wait() # keeping track when the query started (after all tokens have been used, it waits or continues based on the 2hour constraint for each token)
+    tstart, tmax = reset_start_max_quota_wait() # keeping track when the query started 
+                                                # (after all tokens have been used, it waits or continues based on the 2hour 
+                                                # constraint for each token)
     df_places = df_places.loc[:,[id, lon,lat]]
 
+    tokens = FacebookMarketing.load_tokens(tokens_dir)
     maxtokens = len(tokens)
+    ios.printf(f"{maxtokens} tokens loaded.")
     tokenids = cycle(np.arange(1,maxtokens+1,1))
     status = defaultdict(int)
     
@@ -286,26 +291,30 @@ class FacebookMarketing(object):
     for id, row in tqdm(df_places.iterrows(), total=df_places.shape[0]):
       counter += 1
       #print("========== {} of {} ==========".format(counter, df_places.shape[0]))
-
+      #if counter < 84425: #47538:
+      #  continue
+        
       ### QUERY
       for k,v in profiles.items():
         
         code = FBM_QUOTA
+        #print(k, v, code)
+        
         while code == FBM_QUOTA:
-          value, code = fbm.extract_reach_estimate(lon=row[lon], lat=row[lat], ccode=ccode, 
-                                                   radius=radius, unit=unit, specific_params=v, cache_dir=cache_dir) 
+          value, code = fbm.extract_reach_estimate(lon=row[lon], lat=row[lat], ccode=ccode, radius=radius, unit=unit, specific_params=v, cache_dir=cache_dir) 
 
           status[tokenid] = code == FBM_QUOTA
 
           if code in [FBM_SKIP_LOC, FBM_QUOTA, FBM_NOT_YET]:
-            print('k:', k, 'code:', code, 'lon:',row[lon], 'lat:',row[lat]) # bad: 1 quota, 2 bad location, 3: queried but not xtimes
+            ios.printf(f"k:{k}, code:{code}, lon:{row[lon]}, lat:{row[lat]}") 
+            # bad: 1 quota, 2 bad location, 3: queried but not xtimes
             df_places.loc[id,k] = np.nan
           elif code in [FBM_LOADED_DONE, FBM_QUERIED]:
             df_places.loc[id,k] = value # good: -1 loaded, 0 queried
 
           if code == FBM_QUOTA:
             # to try again due to quota
-            print("k:{}, token:{}, rowid:{}, result:fail ({})".format(k, tokenid, id, code))
+            ios.printf("k:{}, token:{}, rowid:{}, result:fail ({})".format(k, tokenid, id, code))
 
             if sum(list(status.values())) == maxtokens:
               # if all tokens have reached quota,then wait
@@ -317,9 +326,7 @@ class FacebookMarketing(object):
                 # if negative, then the FB_MAX_HOURS have passed already since the first token was queried
                 continue
 
-              print("[APIs' quota reached] tstart:{} - tmax:{} | now:{} -> sleeping {} ({} seconds)...".format(tstart, 
-                                                                                                               tmax, current_time, 
-                                                                                                               delta, delta.seconds))
+              ios.printf("[APIs' quota reached] tstart:{} - tmax:{} | now:{} -> sleeping {} ({} seconds)...".format(tstart, tmax, current_time, delta, delta.seconds))
 
               ### sleep 
               time.sleep(delta.seconds)
@@ -327,6 +334,15 @@ class FacebookMarketing(object):
 
             # use next token
             tokenid = next(tokenids)
+            
+            # Load tokens (to allow for new tokens)
+            if tokenid == 1:
+              tokens = FacebookMarketing.load_tokens(tokens_dir)
+              maxtokens = len(tokens)
+              tokenids = cycle(np.arange(1,maxtokens+1,1))
+              tokenid = next(tokenids)
+              ios.printf(f"{maxtokens} tokens loaded. {tokenid} in use.")
+              
             ts = validations.get_current_time_in_country(ccode)
             fbm = fbconnect(tokens, tokenid, ts)
 
@@ -356,7 +372,7 @@ def get_active_users(result):
   if 'estimate_mau_lower_bound' in result:
     return (result['estimate_mau_lower_bound']+result['estimate_mau_upper_bound'])/2
   
-  print(result)
+  ios.printf(result)
   raise Exception("[ERROR] marketing.py | get_active_users | result not found.")
   
 def get_value(results):
@@ -368,7 +384,7 @@ def get_value(results):
     obj = [get_active_users(obj) for obj in results]
     return np.mean(obj)
   except Exception as ex:
-    print(f"[ERROR] marketing.py | get_value | This should not happen: {ex}")
+    ios.printf(f"[ERROR] marketing.py | get_value | This should not happen: {ex}")
   
 def needs_to_be_queried(results):
   
@@ -377,7 +393,7 @@ def needs_to_be_queried(results):
       return FBM_NEEDS_QUERY
     return FBM_LOADED_DONE
   except Exception as ex:
-    print(f"[ERROR] marketing.py | needs_to_be_queried | {ex}")
+    ios.printf(f"[ERROR] marketing.py | needs_to_be_queried | {ex}")
     
 def reset_start_max_quota_wait():
   tstart = datetime.datetime.now()
