@@ -61,7 +61,7 @@ Lisette Espín-Noboa, János Kertész, and Márton Karsai. 2023. Interpreting we
 </picture>
 
 <picture>
-<img width="200" alt="CSH" src="README/CSH.png">
+<img width="200" alt="CSH" src="README/CSH.jpg">
 </picture>
 
 <picture>
