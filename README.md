@@ -4,7 +4,7 @@ Interpreting wealth distribution via poverty map inference using multimodal data
 [![Python 3.7](https://img.shields.io/badge/python-3.7-blue.svg)](https://www.python.org/downloads/release/python-3710/)
 
 <picture>
-<img width="888" alt="screenshot" src="https://github.com/lisette-espin/PovertyMaps/blob/main/paper/main-plots/CNN_CB_model_v6.png">
+<img width="888" alt="screenshot" src="paper/main-plots/CNN_CB_model_v6.png">
 </picture>
 
 ## Analysis (plots)
@@ -24,16 +24,19 @@ Try out the [interactive tool](https://vis.csh.ac.at/poverty-maps) to see the hi
 
 Check how wealth may look now.
 <picture>
-<img width="1505" alt="screenshot" src="https://github.com/lisette-espin/PovertyMaps/blob/main/README/interactive_tool_predict.png">
+<img width="1505" alt="screenshot" src="=README/interactive_tool_predict.png">
 </picture>
 
 Check how wealth has changed over the years.
 <picture>
-<img width="1505" alt="screenshot" src="https://github.com/lisette-espin/PovertyMaps/blob/main/README/interactive_tool_comparison.png">
+<img width="1505" alt="screenshot" src="README/interactive_tool_comparison.png">
 </picture>
 
 ## Scripts
 `cd scripts`
+
+*Check [Pipeline.md](Pipeline.md) for step-by-step guidelines.*
+
 1. Init: `./batch_init.sh -r ../data/Uganda -c UG -y 2016,2018 -n 10`
 2. Features GT: `./batch_features.sh -r ../data/Uganda -c UG -y 2016,2018 -n10`
 3. Features PP: `./batch_features.sh -r ../data/Uganda -c UG -n10`
@@ -54,15 +57,15 @@ Lisette Espín-Noboa, János Kertész, and Márton Karsai. 2023. Interpreting we
 
 ## Credits and Funding
 <picture>
-<img width="200" alt="CEU" src="https://github.com/lisette-espin/PovertyMaps/blob/main/README/CEU.jpeg">
+<img width="200" alt="CEU" src="README/CEU.jpeg">
 </picture>
 
 <picture>
-<img width="200" alt="CSH" src="https://github.com/lisette-espin/PovertyMaps/blob/main/README/CSH.png">
+<img width="200" alt="CSH" src="README/CSH.png">
 </picture>
 
 <picture>
-<img width="200" alt="SoBigData++" src="https://github.com/lisette-espin/PovertyMaps/blob/main/README/SBDPP.png">
+<img width="200" alt="SoBigData++" src="README/SBDPP.png">
 </picture>
 
 ## License
