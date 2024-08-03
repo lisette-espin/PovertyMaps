@@ -49,11 +49,20 @@ Check how wealth has changed over the years.
 9. Poverty maps: `python batch_infer_poverty_maps.py -ccode UG -model CB`
 10. Cross-country testing: `python batch_cross_predictions.py`
 
-## Citation
+---
+
+## Citations
+
+### Model (WWW'2023)
 Lisette Espín-Noboa, János Kertész, and Márton Karsai. 2023. Interpreting wealth distribution via poverty map inference using multimodal data. In Proceedings of Association for Computing Machinery (TheWebConf ’23). ACM, New York, NY, USA, 12 pages. https://doi.org/10.1145/3543507.3583862
-
+<!---
 *Pre-print:* https://arxiv.org/abs/2302.10793
+--->
 
+### RWI vs. IWI Comparison (SoGood@ECMLPKDD'2024)
+*Pre-print:* https://arxiv.org/abs/
+
+---
 
 ## Credits and Funding
 <picture>
