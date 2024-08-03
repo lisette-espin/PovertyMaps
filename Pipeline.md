@@ -52,7 +52,9 @@
 │   │   ├── <country_name>
 │   │   │   ├── <source>
 │   │   │   │   ├── <year>
-│   │   │   │   │   ├── <files>
+│   │   │   │   │   ├── *GC*FL.zip
+│   │   │   │   │   ├── *GE*FL.zip
+│   │   │   │   │   ├── *HR*DT.zip
 ```
 
 
@@ -108,6 +110,7 @@
         2. `project_id`
         3. `service_account`
         4. `clientsecret.json`
+            - This file is generated when adding a `key` [here](https://console.cloud.google.com/iam-admin/serviceaccounts/details/102400032297592831224;edit=true/keys)
 6. Get API keys for Google Maps Static API
     1. Go to [[Use API Keys with Maps Static API](https://developers.google.com/maps/documentation/maps-static/get-api-key)]
     2. You need to create these files, in each add the respective key:
@@ -119,31 +122,44 @@ For example, `cd scripts/`
 
 1. Run init: `./batch_init.sh -r ../data/Uganda -c UG -y 2016,2018 -n 10`
     - Note: It runs 3 scripts (i) prepares folder structure for the given country, (ii) prepares the GT data, (iii) prepares PPlaces
+    - If you have your own PPLACES.csv, you should move it to `../data/<country>/features/pplaces/`
 2. Run features GT: `./batch_features.sh -r ../data/Uganda -c UG -y 2016,2018 -n 10`
+    - Note 1: pass argument `-z` to specify the size (width x height) of satellite images, e.g., -z 160x160 (when using 400x400m grid-cells) or 640x640 (when using OSM pplaces)
+    - Note 2: pass argument `-m` to specify the bounding boxes for the VIIRS (comma separated meters), e.g., -m 400,800,1200,1600 (when using 400x400m grid-cells). If nothing is passed the default is: 1600,2000,5000,10000 (e.g., when using OSM pplaces)
+    - Note 3: pass argument `-w` to specify the bounding box for OSM in meters, e.g., 1600 (when using OSM pplaces) or 400 (when using 400x400m grid-cells)
+    - Note 4: pass correct path to API keys.
+    - After running this step, you can move to step \#4
 3. Run features PP: `./batch_features.sh -r ../data/Uganda -c UG -n 10`
+    - Same as in step 2. Be aware of passing the correct values for `-z`, `-m` and `-w`
+    - Note that this step is not needed to run steps \#4, 5, 6, 7, 8, and 9.
 4. Run Pre-processing: `./batch_preprocessing.sh -r ../data/Uganda -c UG -y 2016,2018 -o none -t all -k 5 -e 3`
     - Note: `-t` is the argument to specify the recency of the ground truth data to use for training. The available values are: all, newest, oldest
 5. Run CatBoost training: `./batch_xgb_train.sh -r ../data/Uganda -c UG -y 2016,2018 -l none -t all -a mean_wi,std_wi -f all -k 4 -v 1`
-    - Weights: Run `notebooks/_CatBoost_Weights_Cat10.ipynb` then update weights in `scripts/xgb_train.py` (@TODO: make it a script)
+    - Weights: Run `notebooks/_CatBoost_Weights_Cat10.ipynb` then update weights in `resources/CB_weights.json` and `maxval` in `resources/survey/available_metadata.json` (@TODO: make it a script)
     - Weighted: `./batch_xgb_train.sh -r ../data/Uganda -c UG -y 2016,2018 -l none -t all -a mean_wi,std_wi -f all -k 4 -v 1 -w 1`
     - Note: `-f` is the argument to specify the source of features. Available: all, FBM, FBP, FBMV, NTLL, OCI, OSM, and any combination of the individual sources sorted ASC alphabetically, and separated with `_`, eg. FBM_FBMP_OCI
-6. Run CNN training (& feature maps): Run scripts in `SLURM`
+6. Run Augmentation: `python cnn_augmentation.py -r ../data/Uganda -years 2016,2018 -dhsloc none -probaug 1.0 -njobs 10 -imgwidth 640 -imgheight 640`
+    - Note 1: Change `imgwidth` and `imgheight` accordingly, e.g., 640 when using OSM pplaces, and 160 when using 400x400m grid cells.
+7. Run CNN training (& feature maps): Run scripts in `SLURM` (for `CNN` and `CNNa`)
     - Create folder: `slurm/dhsloc_none/logs-<ccode>`
     - see `../slurm/LB_train_r1_f12.sh` (this runs Liberia, run 1, fold 1 and 2)
     - Send job to schedule: `sbatch LB_train_r1_f12.sh`
     - Run CNN merging files: see `notebooks/_CNN_Merging_Tuning_Files.ipynb`
     - Run `../slurm/LB_train_r1_r2.sh` (this runs Liberia, run 1 and 2)
-7. Run fmaps: Run scripts in `SLURM`
+8. Run fmaps: Run scripts in `SLURM` (for `CNN` and `CNNa`)
     - see `../slurm/LB_fmaps_noaug_r12.sh` (this runs Liberia, run 1 and 2)
     - Send job to schedule: `sbatch LB_fmaps_noaug_r12.sh`
-8. Run Augmentation: `python cnn_augmentation.py -r ../data/Uganda -years 2016,2018 -dhsloc none -probaug 1.0 -njobs 10 -imgwidth 640 -imgheight 640`
 9. Run CNN+CatBoost training: `./batch_xgb_train.sh -r ../data/Uganda -c UG -y 2016,2018 -l none -t all -a mean_wi,std_wi -f all -k 4 -v 1 -n offaug_cnn_mp_dp_relu_sigmoid_adam_mean_std_regression -e 19 -w 1`
+   - Note 1: change `-m` (CNN model with and without augmentation) and `-w` (weighted CB or not) accordingly.
 10. Run Poverty map: `python batch_infer_poverty_maps.py -ccode UG -model CB`
-    - First, copy fmaps from `data/<country>/results/samples/*/epoch*/*aug_cnn*/layer-19/fmap_train.npz` to `paper/results/pplaces_inference/fmaps/` 
-    - Rename the file as `<CCODE>_<MODEL>` where `CCODE` is 2-digits, and `MODEL` either `CNN` or `CCNa`.
-11. Run Cross-country testing: `python batch_cross_predictions.py`
+    - First, make sure you have collected the features for PPLACES (step \#3)
+    - Second, run models: `CB, CBw, CNN, CNNa` (passing each of them as `-model <model_name>`)
+        - Note that, running `-model CNN*` will create the feature maps for the pplaces, required to run the combined models
+    - Third, run the combined models: `CNN+CB, CNNa+CB, CNN+CBw, CNNa+CBw`
+    - For countries with many `pplaces` e.g., `>10K` it is recommended to use a high-memory server.
+    - `CNN` and `CNN_a` must be run on a GPU.
+11. Run Cross-country testing: `python batch_cross_predictions.py` (on a GPU)
     - First, update list of countries `COUNTRIES` to include in the transfer (in the same script).
-
 
 ---
 
