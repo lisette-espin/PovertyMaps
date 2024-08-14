@@ -59,8 +59,8 @@ Lisette Espín-Noboa, János Kertész, and Márton Karsai. 2023. Interpreting we
 *Pre-print:* https://arxiv.org/abs/2302.10793
 --->
 
-### RWI vs. IWI Comparison (SoGood@ECMLPKDD'2024)
-*Pre-print:* https://arxiv.org/abs/
+### A Comparative Analysis of Wealth Index Predictions (SoGood@ECMLPKDD'2024)
+*Pre-print:* [https://arxiv.org/abs/2408.01631](https://arxiv.org/abs/2408.01631)
 
 ---
 
