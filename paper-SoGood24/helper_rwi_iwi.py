@@ -13,6 +13,7 @@ from scipy import stats
 import powerlaw
 import matplotlib as mpl
 import matplotlib.ticker as mticker
+from scipy.stats import gaussian_kde
 from sklearn.metrics import mean_squared_error
 from matplotlib.colors import LinearSegmentedColormap
 from matplotlib.ticker import ScalarFormatter
@@ -217,6 +218,9 @@ def plot_maps(metadata, country, fig, axes, **kwargs):
                 
 def plot_pdf(metadata, country, axes, **kwargs):
     
+    ymin = min([gaussian_kde(obj['data'][obj['mean']]).evaluate(obj['data'][obj['mean']]).min() for key, obj in metadata.items()])
+    ymax = max([gaussian_kde(obj['data'][obj['mean']]).evaluate(obj['data'][obj['mean']]).max() for key, obj in metadata.items()])
+
     for key, obj in metadata.items():
     
         ax = axes[obj['index']]
@@ -243,11 +247,19 @@ def plot_pdf(metadata, country, axes, **kwargs):
         t = ax.text(s=f'Gini={gc:.2f}', x=1.0, y=0.12, ha='right', va='bottom', transform=ax.transAxes)
         #t.set_bbox(dict(facecolor='white', alpha=0.8, edgecolor='white'))
         
-        ax.set_xlim((values.min(), values.max()))
-        ax.set_xticklabels([])
+        # ax.set_xlim((values.min(), values.max()))
+        # ax.set_xticklabels([])
     
+        # same y-axis
+        if ymin is not None and ymax is not None:
+            ax.set_ylim((ymin,ymax))
+            
+            if obj['index'] != 0:
+                ax.set_yticklabels([])
+            
 def plot_ecdf(metadata, country, axes, **kwargs):
 
+    
     for key, obj in metadata.items():
     
         ax = axes[obj['index']]
@@ -270,7 +282,7 @@ def plot_ecdf(metadata, country, axes, **kwargs):
         # ax.text(s=f'$\mu=${m:.2f}, $\sigma=${s:.2f}', x=1.0, y=0.12, ha='right', va='bottom', transform=ax.transAxes)
         # ax.text(s=f'Gini={gc:.2f}', x=1.0, y=0, ha='right', va='bottom', transform=ax.transAxes)
 
-        ax.set_xlim((values.min(), values.max()))
+        # ax.set_xlim((values.min(), values.max()))
         # ax.set_xticklabels([])
         
         ## POVERTY LINE: IWI-50 (Headcount 2.00$)
@@ -285,6 +297,9 @@ def plot_ecdf(metadata, country, axes, **kwargs):
         smooth = 1 if values.max()-values.min()<30 else 2
         ax.text(x_intersection+smooth, y_intersection, f'IWI-{iwipl}\nPoverty Line', fontsize=12, rotation=0, va='top', ha='left')
     
+        if obj['index'] != 0:
+                ax.set_yticklabels([])
+                
 def plot_ccdf(metadata, country, axes, **kwargs):
 
     for key, obj in metadata.items():
@@ -347,6 +362,8 @@ def get_metadata_template(gdf_rwi, gdf_lee, gdf_iwi, rescale=False):
 
         
 def plot_comparison_maps(gdf_rwi, gdf_lee, gdf_iwi, country, output_dir=None, **kwargs):
+    dpi = kwargs.pop('dpi', 300)
+    
     figsize = kwargs.pop('figsize', (15,5))
     fig, axes = plt.subplots(1,3,figsize=figsize)
     kind = kwargs.get('kind','raw')
@@ -364,7 +381,7 @@ def plot_comparison_maps(gdf_rwi, gdf_lee, gdf_iwi, country, output_dir=None, **
         
     if output_dir is not None:
         fn = os.path.join(output_dir, f"maps_{COUNTRIES[country]['code3']}_{kind}.pdf")
-        fig.savefig(fn, dpi=300, bbox_inches='tight')
+        fig.savefig(fn, dpi=dpi, bbox_inches='tight')
         print(f'{fn} saved!')
         
     plt.show()
@@ -378,6 +395,8 @@ def do_rescale(gdf_rwi, gdf_iwi):
 
 
 def plot_comparison_dist(gdf_rwi, gdf_lee, gdf_iwi, country, output_dir=None, **kwargs):
+    dpi = kwargs.pop('dpi', 300)
+    
     title = kwargs.pop('title', None)
     suptitle = kwargs.pop('suptitle', False)
     years = kwargs.pop('years', None)
@@ -408,22 +427,31 @@ def plot_comparison_dist(gdf_rwi, gdf_lee, gdf_iwi, country, output_dir=None, **
             # axes[0,obj['index']].set_title(f"{metric.upper()} by {obj['source']}{post}" if title else '')
             axes[0,obj['index']].set_title(obj['source'] if title else '')
 
+    # same x-axis
+    xmin = min([obj['data'][obj['mean']].min() for key, obj in metadata.items()])
+    xmax = max([obj['data'][obj['mean']].max() for key, obj in metadata.items()])
+    for ax in axes.flatten():
+        ax.set_xlim((xmin, xmax))
+        
+    # x-axis label
     from matplotlib import ticker
     import matplotlib
     for key, obj in metadata.items():
+        # bottom
         ax = axes[-1,obj['index']]
         ax.set_xlabel('$\hat{IWI}$' if key=='rwi' else '$IWI$')
-        
+        # not bottom
+        for ax in axes[0:-1,obj['index']]:
+            ax.set_xticklabels([])
     
     if suptitle:
         plt.suptitle("WEALTH DISTRIBUTION")
-
         
     plt.tight_layout()
-    plt.subplots_adjust(hspace=0.1) 
+    plt.subplots_adjust(hspace=0.1, wspace=0.05) 
     if output_dir is not None:
         fn = os.path.join(output_dir, f"dist_{COUNTRIES[country]['code3']}.pdf")
-        fig.savefig(fn, dpi=300, bbox_inches='tight')
+        fig.savefig(fn, dpi=dpi, bbox_inches='tight')
         print(f'{fn} saved!')
     
     plt.show()
@@ -450,6 +478,8 @@ def get_significance_stars(p_value):
         return ''
 
 def plot_comparison_overlapping_cells(gdf_rwi, gdf_lee, gdf_iwi, country, sources=('iwi','rwi'), output_dir=None, **kwargs):
+    dpi = kwargs.pop('dpi', 300)
+    
     suptitle = kwargs.pop('suptitle', False)
     max_distance = kwargs.pop('max_distance', 10)
     
@@ -481,7 +511,6 @@ def plot_comparison_overlapping_cells(gdf_rwi, gdf_lee, gdf_iwi, country, source
     if tmp.shape[0] != tmp.index.nunique() or tmp.shape[0] != tmp.index_right.nunique():
         print("[WARNING]", tmp.shape[0], tmp.index.nunique(), tmp.index_right.nunique(), "computing mean...")
         
-        
     # left scatter
     ax = axes[0]
     
@@ -493,10 +522,15 @@ def plot_comparison_overlapping_cells(gdf_rwi, gdf_lee, gdf_iwi, country, source
     ax.legend(loc=2)
     ax.set_xlabel(other_name)
     ax.set_ylabel(main_name)
-    mi = min(tmp[other_col].min(),tmp[main_col].min())
-    ma = max(tmp[other_col].max(),tmp[main_col].max())
+    #mi = min(tmp[other_col].min(),tmp[main_col].min())
+    #ma = max(tmp[other_col].max(),tmp[main_col].max())
+    mi=0
+    ma=100
+    ax.set_xlim((mi,ma))
+    ax.set_ylim((mi,ma))
     ax.plot([mi,ma],[mi,ma],ls='--', lw=1, c='grey')
     ax.spines[['right', 'top']].set_visible(False)
+    
     
     n = tmp.shape[0]
     ro,pv = pearsonr(tmp[other_col], tmp[main_col])
@@ -517,6 +551,7 @@ def plot_comparison_overlapping_cells(gdf_rwi, gdf_lee, gdf_iwi, country, source
     t.set_bbox(dict(facecolor='white', alpha=0.8, edgecolor='white'))
     t = ax.text(s=f"$\\rho=${ro:.2f}{ps}", va='bottom', ha='right', transform=ax.transAxes, x=1, y=0.05)
     t.set_bbox(dict(facecolor='white', alpha=0.8, edgecolor='white'))
+    
     
     # right map
     ax = axes[1]
@@ -550,7 +585,7 @@ def plot_comparison_overlapping_cells(gdf_rwi, gdf_lee, gdf_iwi, country, source
     plt.tight_layout()
     if output_dir is not None:
         fn = os.path.join(output_dir, f"samecells_{COUNTRIES[country]['code3']}_{'_'.join(sources)}.pdf")
-        fig.savefig(fn, dpi=300, bbox_inches='tight')
+        fig.savefig(fn, dpi=dpi, bbox_inches='tight')
         print(f'{fn} saved!')
         
     plt.show()
@@ -558,6 +593,8 @@ def plot_comparison_overlapping_cells(gdf_rwi, gdf_lee, gdf_iwi, country, source
     
     
 def plot_comparison_admin_maps(gdf_rwi, gdf_lee, gdf_iwi, country, boundary_fn, admin_level, output_dir=None, **kwargs):
+    dpi = kwargs.pop('dpi', 300)
+    
     years = kwargs.pop('years', None)
     title = kwargs.pop('title', False)
     suptitle = kwargs.pop('suptitle', False)
@@ -669,7 +706,7 @@ def plot_comparison_admin_maps(gdf_rwi, gdf_lee, gdf_iwi, country, boundary_fn, 
 
         if output_dir is not None:
             fn = os.path.join(output_dir, f"maps_{COUNTRIES[country]['code3']}_{kind}_admin{admin_level}.pdf")
-            fig.savefig(fn, dpi=300, bbox_inches='tight')
+            fig.savefig(fn, dpi=dpi, bbox_inches='tight')
             print(f'{fn} saved!')
 
         plt.show()
@@ -752,6 +789,8 @@ def show_preliminaries(gini_fn, gdp_fn, survey_years, output_dir=None):
 
 def plot_preliminaries(df_preliminaries, output_dir=None, **kwargs):
     
+    dpi = kwargs.pop('dpi', 300)
+    
     def duplicate(ya,i,y_actual):
         for j,yb in enumerate(y_actual):
             if j<i:
@@ -824,7 +863,7 @@ def plot_preliminaries(df_preliminaries, output_dir=None, **kwargs):
     
     if output_dir is not None:
         fn = os.path.join(output_dir, 'data_preliminaries.pdf')
-        fig.savefig(fn, dpi=300, bbox_inches='tight')
+        fig.savefig(fn, dpi=dpi, bbox_inches='tight')
         print(f'{fn} saved!')
         
     plt.show()

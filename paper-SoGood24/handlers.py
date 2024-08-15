@@ -92,14 +92,6 @@ RECENCY_BEST = None #RECENCY['combined']
 BEST_RECENCY = {'SL':RECENCY['combined'], 'UG':RECENCY['combined'], 'LB':RECENCY['combined'], 
                 'GA':RECENCY['new-new'], 'RW':RECENCY['new-new'], 'ZA':RECENCY['new-new']}
 
-## @deprecated: this is now computed dynamically
-# BEST_MODELS = {'Sierra Leone':{'all':'CB$_w$', 'OCI_FBP_NTLL_OSM':'CB'},
-#                'Uganda':      {'all':'CB',     'OCI_FBP_NTLL_OSM':'CB$_w$'},
-#                'Rwanda':      {'all':None,     'OCI_FBP_NTLL_OSM':'CB'},
-#                'Liberia':     {'all':None,     'OCI_FBP_NTLL_OSM':'CNN$_a$+CB'},
-#                'Gabon':       {'all':None,     'OCI_FBP_NTLL_OSM':'CNN$_a$+CB$_w$'},
-#                'South Africa':{'all':None,     'OCI_FBP_NTLL_OSM':'CB'}} ### <---------------------------------------------------------------------------------------------------------------------------------------- @TODO: once CNNs and Combined are donde, update here (maybe it is not CB)
-
 
 # https://data.worldbank.org/indicator
 WB_INDICATORS = {'Sierra Leone':{'gini':'35.7 (2018)', 'gdp_per_capita':'515 (2016), 520 (2018), 507 (2019)', 'gdp_growth':'6.3 (2016), 3.5 (2018), 5.3 (2019)'}, #2016, 2018, 2019
@@ -243,91 +235,6 @@ def get_performance(root=None, countries=None, fsource='all', output=None):
         
   return df
 
-# def get_summary_performance(df, only_best=True, metric='mse', features_source='all', output=None):
-  
-#   if metric not in ['r2','mse','rmse','nrmse']:
-#     raise Exception("Metric not valid.")
-  
-#   ascending = 'mse' in metric
-  
-#   fn = os.path.join(output, f"summary_performance_{metric}_{'best' if only_best else 'all'}.csv") if output is not None else None
-#   if fn is not None and ios.exists(fn):
-#     df_baselines = ios.load_csv(fn)
-#   else:
-#     data = df.query("recency not in  @RECENCY_TEST").copy()
-#     print(f"[INFO] {data.shape[0]} valid records, {data.shape[1]} columns.")
-    
-#     #recency
-#     group_rec = ['country','model','relocation','augmented','weighted','recency']
-#     df_rec = data.query("augmented=='no' and weighted=='no' and features in @BASIC_FEATURES and features_source == @features_source").copy()
-#     df_rec = df_rec.query("relocation==@RELOCATION_BEST") if only_best else df_rec
-#     df_rec = df_rec.groupby(group_rec).agg({metric:['mean','std'], 
-#                                             f"{metric}_mean_wi":['mean','std'], 
-#                                             f"{metric}_std_wi":['mean','std'],}).reset_index()
-#     df_rec.columns = [col[0] if col[1]=='' else '_'.join(col).strip() for col in df_rec.columns.values]
-    
-#     # relocation
-#     group_rel = ['country','model','recency','augmented','weighted','relocation']
-#     df_rel = data.query("augmented=='no' and weighted=='no' and features in @BASIC_FEATURES and features_source == @features_source").copy()
-#     if RECENCY_BEST is not None:
-#         df_rel = df_rel.query("recency==@RECENCY_BEST") if only_best else df_rel
-#     else:
-#         q = " OR ".join(["(country==@ccode and recency==@best_recency)" for ccode,best_recency in BEST_RECENCY.items()])
-#         df_rel = df_rel.query(q) if only_best else df_rel
-        
-#     df_rel = df_rel.groupby(group_rel).agg({metric:['mean','std'], 
-#                                             f"{metric}_mean_wi":['mean','std'], 
-#                                             f"{metric}_std_wi":['mean','std'],}).reset_index()
-#     df_rel.columns = [col[0] if col[1]=='' else '_'.join(col).strip() for col in df_rel.columns.values]
-    
-#     # augmented
-#     group_aug = ['country','model','recency','relocation','weighted','augmented']
-#     df_aug = data.query("model in @CNN_CLASS and weighted=='no' and features in @IMAGE_FEATURE").copy()
-#     # @TODO: check RECENCY_BEST None
-#     df_aug = df_aug.query("recency==@RECENCY_BEST and relocation==@RELOCATION_BEST") if only_best else df_aug
-#     df_aug = df_aug.groupby(group_aug).agg({metric:['mean','std'], 
-#                                             f"{metric}_mean_wi":['mean','std'], 
-#                                             f"{metric}_std_wi":['mean','std'],}).reset_index()
-#     df_aug.columns = [col[0] if col[1]=='' else '_'.join(col).strip() for col in df_aug.columns.values]
-    
-#     # weighted samples
-#     group_wei = ['country','model','recency','relocation','augmented','weighted']
-#     df_wei = data.query("model in @MODELS_CB and features in @METADATA_FEATURES and features_source == @features_source").copy()
-#     # @TODO: check RECENCY_BEST None
-#     df_wei = df_wei.query("recency==@RECENCY_BEST and relocation==@RELOCATION_BEST") if only_best else df_wei
-#     df_wei = df_wei.groupby(group_wei).agg({metric:['mean','std'], 
-#                                             f"{metric}_mean_wi":['mean','std'], 
-#                                             f"{metric}_std_wi":['mean','std'],}).reset_index()
-#     df_wei.columns = [col[0] if col[1]=='' else '_'.join(col).strip() for col in df_wei.columns.values]
-    
-#     # condensed aggregated
-#     tmp = df_rec.groupby(['country',group_rec[-1]]).mean().round(2).reset_index().sort_values(['country',f'{metric}_mean'],ascending=[True,ascending])
-#     tmp.loc[:,'kind'] = 'recency'
-#     tmp.rename(columns={'recency':'configuration'}, inplace=True)
-#     df_baselines = tmp.copy()
-    
-#     tmp = df_rel.groupby(['country',group_rel[-1]]).mean().round(2).reset_index().sort_values(['country',f'{metric}_mean'],ascending=[True,ascending])
-#     tmp.loc[:,'kind'] = 'relocation'
-#     tmp.rename(columns={'relocation':'configuration'}, inplace=True)
-#     df_baselines = pd.concat([df_baselines,tmp])
-    
-#     tmp = df_aug.groupby(['country',group_aug[-1]]).mean().round(2).reset_index().sort_values(['country',f'{metric}_mean'],ascending=[True,ascending])
-#     tmp.loc[:,'kind'] = 'augmented'
-#     tmp.rename(columns={'augmented':'configuration'}, inplace=True)
-#     df_baselines = pd.concat([df_baselines,tmp])
-    
-#     tmp = df_wei.groupby(['country',group_wei[-1]]).mean().round(2).reset_index().sort_values(['country',f'{metric}_mean'],ascending=[True,ascending])
-#     tmp.loc[:,'kind'] = 'weighted'
-#     tmp.rename(columns={'weighted':'configuration'}, inplace=True)
-#     df_baselines = pd.concat([df_baselines,tmp])
-    
-#     df_baselines.dropna(inplace=True)
-    
-#     if fn is not None:
-#       ios.save_csv(df_baselines, fn)
-      
-#   return df_baselines
-      
   
 def get_summary_performance(df, only_best=True, metric='mse', features_source='all', output=None):
   
@@ -2319,118 +2226,6 @@ def plot_cross_country_performance(df_dr, metric, results, overall=True, output=
   plt.show()
   plt.close()
 
-# def plot_cross_country_performance(df_dr, metric, results, overall=True, output=None, only={'country':None,'kind':None}):
-
-#   ### create summary first
-#   df_summary = pd.DataFrame(columns=['model','country_source', 'country_target', f'{metric}_within',f'{metric}_across','kind'])
-#   data = tbl_cross_testing(df_dr, metric=metric, output=results, save=False).reset_index().copy()
-  
-#   kinds = ['overall', 'mean', 'std']
-#   if not overall:
-#     _ = kinds.pop(0)
-
-#   # for country in data.
-#   for kind in kinds:
-#       tmp = data.loc[:,['source_model','source_country','target_country']].copy()
-#       tmp.rename(columns={'source_model':'model'}, inplace=True)
-#       tmp.loc[:,'kind'] = kind
-#       df_summary = pd.concat([df_summary, tmp], ignore_index=True)
-
-#       for id, row in data.iterrows():
-#           model = row.source_model
-#           country_source = row.source_country
-#           country_target = row.target_country
-#           country_within_code = COUNTRIES[country]['code'] #'SL' if country == 'Sierra Leone' else 'UG'
-#           country_across_code = COUNTRIES[country_target]['code'] #'UG' if country_within_code == 'SL' else 'SL'
-#           var_col = "" if kind =='overall' else f'_{kind}_wi'
-#           within = row[f"{country_within_code}_{metric}{var_col}"]
-#           across = row[f"{country_across_code}_{metric}{var_col}"]
-
-#           index = df_summary.query("model==@model and country==@country and kind==@kind").index
-#           df_summary.loc[index,f"{metric}_within"] = within
-#           df_summary.loc[index,f"{metric}_across"] = across
-#           df_summary.loc[index,'kind'] = f"IWI_{kind}"
-
-#   palette = 'tab20' #tab10
-#   if only['country'] is not None and only['kind'] is not None:
-#     # only 1 country
-#     onlyc = only['country']
-#     onlyk = only['kind'] 
-#     only['kind'] = f'IWI_{onlyk}' if not onlyk.startswith('IWI_') else onlyk
-#     onlyk = only['kind']
-#     df_summary = df_summary.query("country==@onlyc and kind==@onlyk")
-#     markers = ['X']
-#     fg = sns.FacetGrid(data=df_summary.round(2), height=6, aspect=1.2, legend_out=True, sharex=False, sharey=False)
-#     fg.map_dataframe(sns.scatterplot, x=f'{metric}_within', y=f"{metric}_across", 
-#                      hue='model', palette=palette, markers=markers)
-#   else:
-#     # all countries
-#     fg = sns.FacetGrid(data=df_summary.round(2), col='kind',height=3.8, aspect=0.62, 
-#                        legend_out=True, sharex=False, sharey=False)
-#     markers = ['X','o']
-#     fg.map_dataframe(sns.scatterplot, x=f'{metric}_within', y=f"{metric}_across", hue='model', 
-#                      style='country',  palette=palette, markers=markers, s=60)
-#   fg.add_legend()
-#   fg.set_titles(row_template = '{row_name}', col_template = '{col_name}')
-  
-#   ### diagonal
-#   num_cols = [c for c in df_summary.columns if 'within' in c or 'across' in c]
-#   mins = {}
-#   for ax in fg.axes.flatten():
-#     kind = only['kind'] if only['kind'] is not None else ax.get_title()
-#     tmp = df_summary.query("kind==@kind").copy()
-#     mi, ma = tmp[num_cols].min().min(), tmp[num_cols].max().max()
-#     ax.plot([mi,ma],[mi,ma],ls='solid',c='grey',lw=1,zorder=0)
-#     mins[kind] = mi
-
-#   ### best metadata-single
-#   for ax in fg.axes.flatten():
-#     kind = only['kind'] if only['kind'] is not None else ax.get_title()
-#     mi = df_summary.query("kind==@kind")[num_cols].min().min()
-#     for country,marker in zip(*[df_dr.country.unique(),markers]):
-#       tmp = df_dr.query("country==@country and recency==@RECENCY_BEST \
-#                          and relocation==@RELOCATION_BEST and features not in @MAIN_FEATURES").groupby(['model','features']).mean().reset_index()
-      
-#       for m in ['max','min']:
-#         tmp2 = tmp[tmp[metric]==tmp[metric].min()].reset_index(drop=True) if m=='min' else tmp[tmp[metric]==tmp[metric].max()].reset_index(drop=True)
-#         var_col = metric if kind=='overall' else f'{metric}_{kind}_wi'
-#         val = tmp2.iloc[0][var_col.replace('IWI_','')]
-        
-#         subi = FEATURE_MAP[tmp2.iloc[0].features]
-#         c = 'grey'
-        
-#         ax.plot([mins[kind],val], [val,val], ls='dotted', color=c, zorder=0, lw=1)
-#         ax.plot([val,val], [mins[kind],val], ls='dotted', color=c, zorder=0, lw=1)
-#         ax.plot([val],[mins[kind]], marker=marker, markersize=7, markerfacecolor='black', markeredgecolor='white')
-        
-#         y = 0.085
-#         if m == 'max':
-#           ha = 'right' if COUNTRIES[country]['code']=='SL' else 'left' if COUNTRIES[country]['code']=='UG' else 'center'
-#         else:
-#           special = COUNTRIES[country]['code']=='SL' and m=='min' and kind=='IWI_mean'
-#           ha = 'center' if special else 'left'
-#           y = -0.06 if special else y
-#         ax.text(s=subi, x=val, y=y, ha=ha, va='center', c=c, transform=ax.get_xaxis_transform())
-  
-#   fg.set_xlabels(f"{metric.upper()} within-country")
-#   fg.set_ylabels(f"{metric.upper()} cross-country")
-  
-#   add_panel_labels(fg)
-#   plt.tight_layout()
-#   plt.subplots_adjust(wspace=0.25, hspace=0.25)
-#   sns.move_legend(fg, "upper left", bbox_to_anchor=(0.935, 0.99), handletextpad=0.1)
-
-#   #plt.subplots_adjust(wspace=0.2, hspace=0.2)
-  
-#   ### savefig
-#   if output is not None:
-#     fn = os.path.join(output,f"cross_country_performance_{metric}.pdf")
-#     fg.savefig(fn, dpi=300)
-#     print(f"{fn} saved!")
-  
-#   plt.show()
-#   plt.close()
-  
   
 def plot_sample_weights_performance(metric, nclasses, output=None):
 
@@ -3053,3 +2848,214 @@ def get_feature_counts_from_gt(df_gt):
       feature_counts[f] = fn
   return feature_counts
 
+
+
+### OLD CODE:
+
+## @deprecated: this is now computed dynamically
+# BEST_MODELS = {'Sierra Leone':{'all':'CB$_w$', 'OCI_FBP_NTLL_OSM':'CB'},
+#                'Uganda':      {'all':'CB',     'OCI_FBP_NTLL_OSM':'CB$_w$'},
+#                'Rwanda':      {'all':None,     'OCI_FBP_NTLL_OSM':'CB'},
+#                'Liberia':     {'all':None,     'OCI_FBP_NTLL_OSM':'CNN$_a$+CB'},
+#                'Gabon':       {'all':None,     'OCI_FBP_NTLL_OSM':'CNN$_a$+CB$_w$'},
+#                'South Africa':{'all':None,     'OCI_FBP_NTLL_OSM':'CB'}} ### <------- @TODO: once CNNs and Combined are donde, update here (maybe it is not CB)
+
+# def get_summary_performance(df, only_best=True, metric='mse', features_source='all', output=None):
+  
+#   if metric not in ['r2','mse','rmse','nrmse']:
+#     raise Exception("Metric not valid.")
+  
+#   ascending = 'mse' in metric
+  
+#   fn = os.path.join(output, f"summary_performance_{metric}_{'best' if only_best else 'all'}.csv") if output is not None else None
+#   if fn is not None and ios.exists(fn):
+#     df_baselines = ios.load_csv(fn)
+#   else:
+#     data = df.query("recency not in  @RECENCY_TEST").copy()
+#     print(f"[INFO] {data.shape[0]} valid records, {data.shape[1]} columns.")
+    
+#     #recency
+#     group_rec = ['country','model','relocation','augmented','weighted','recency']
+#     df_rec = data.query("augmented=='no' and weighted=='no' and features in @BASIC_FEATURES and features_source == @features_source").copy()
+#     df_rec = df_rec.query("relocation==@RELOCATION_BEST") if only_best else df_rec
+#     df_rec = df_rec.groupby(group_rec).agg({metric:['mean','std'], 
+#                                             f"{metric}_mean_wi":['mean','std'], 
+#                                             f"{metric}_std_wi":['mean','std'],}).reset_index()
+#     df_rec.columns = [col[0] if col[1]=='' else '_'.join(col).strip() for col in df_rec.columns.values]
+    
+#     # relocation
+#     group_rel = ['country','model','recency','augmented','weighted','relocation']
+#     df_rel = data.query("augmented=='no' and weighted=='no' and features in @BASIC_FEATURES and features_source == @features_source").copy()
+#     if RECENCY_BEST is not None:
+#         df_rel = df_rel.query("recency==@RECENCY_BEST") if only_best else df_rel
+#     else:
+#         q = " OR ".join(["(country==@ccode and recency==@best_recency)" for ccode,best_recency in BEST_RECENCY.items()])
+#         df_rel = df_rel.query(q) if only_best else df_rel
+        
+#     df_rel = df_rel.groupby(group_rel).agg({metric:['mean','std'], 
+#                                             f"{metric}_mean_wi":['mean','std'], 
+#                                             f"{metric}_std_wi":['mean','std'],}).reset_index()
+#     df_rel.columns = [col[0] if col[1]=='' else '_'.join(col).strip() for col in df_rel.columns.values]
+    
+#     # augmented
+#     group_aug = ['country','model','recency','relocation','weighted','augmented']
+#     df_aug = data.query("model in @CNN_CLASS and weighted=='no' and features in @IMAGE_FEATURE").copy()
+#     # @TODO: check RECENCY_BEST None
+#     df_aug = df_aug.query("recency==@RECENCY_BEST and relocation==@RELOCATION_BEST") if only_best else df_aug
+#     df_aug = df_aug.groupby(group_aug).agg({metric:['mean','std'], 
+#                                             f"{metric}_mean_wi":['mean','std'], 
+#                                             f"{metric}_std_wi":['mean','std'],}).reset_index()
+#     df_aug.columns = [col[0] if col[1]=='' else '_'.join(col).strip() for col in df_aug.columns.values]
+    
+#     # weighted samples
+#     group_wei = ['country','model','recency','relocation','augmented','weighted']
+#     df_wei = data.query("model in @MODELS_CB and features in @METADATA_FEATURES and features_source == @features_source").copy()
+#     # @TODO: check RECENCY_BEST None
+#     df_wei = df_wei.query("recency==@RECENCY_BEST and relocation==@RELOCATION_BEST") if only_best else df_wei
+#     df_wei = df_wei.groupby(group_wei).agg({metric:['mean','std'], 
+#                                             f"{metric}_mean_wi":['mean','std'], 
+#                                             f"{metric}_std_wi":['mean','std'],}).reset_index()
+#     df_wei.columns = [col[0] if col[1]=='' else '_'.join(col).strip() for col in df_wei.columns.values]
+    
+#     # condensed aggregated
+#     tmp = df_rec.groupby(['country',group_rec[-1]]).mean().round(2).reset_index().sort_values(['country',f'{metric}_mean'],ascending=[True,ascending])
+#     tmp.loc[:,'kind'] = 'recency'
+#     tmp.rename(columns={'recency':'configuration'}, inplace=True)
+#     df_baselines = tmp.copy()
+    
+#     tmp = df_rel.groupby(['country',group_rel[-1]]).mean().round(2).reset_index().sort_values(['country',f'{metric}_mean'],ascending=[True,ascending])
+#     tmp.loc[:,'kind'] = 'relocation'
+#     tmp.rename(columns={'relocation':'configuration'}, inplace=True)
+#     df_baselines = pd.concat([df_baselines,tmp])
+    
+#     tmp = df_aug.groupby(['country',group_aug[-1]]).mean().round(2).reset_index().sort_values(['country',f'{metric}_mean'],ascending=[True,ascending])
+#     tmp.loc[:,'kind'] = 'augmented'
+#     tmp.rename(columns={'augmented':'configuration'}, inplace=True)
+#     df_baselines = pd.concat([df_baselines,tmp])
+    
+#     tmp = df_wei.groupby(['country',group_wei[-1]]).mean().round(2).reset_index().sort_values(['country',f'{metric}_mean'],ascending=[True,ascending])
+#     tmp.loc[:,'kind'] = 'weighted'
+#     tmp.rename(columns={'weighted':'configuration'}, inplace=True)
+#     df_baselines = pd.concat([df_baselines,tmp])
+    
+#     df_baselines.dropna(inplace=True)
+    
+#     if fn is not None:
+#       ios.save_csv(df_baselines, fn)
+      
+#   return df_baselines
+      
+    
+# def plot_cross_country_performance(df_dr, metric, results, overall=True, output=None, only={'country':None,'kind':None}):
+
+#   ### create summary first
+#   df_summary = pd.DataFrame(columns=['model','country_source', 'country_target', f'{metric}_within',f'{metric}_across','kind'])
+#   data = tbl_cross_testing(df_dr, metric=metric, output=results, save=False).reset_index().copy()
+  
+#   kinds = ['overall', 'mean', 'std']
+#   if not overall:
+#     _ = kinds.pop(0)
+
+#   # for country in data.
+#   for kind in kinds:
+#       tmp = data.loc[:,['source_model','source_country','target_country']].copy()
+#       tmp.rename(columns={'source_model':'model'}, inplace=True)
+#       tmp.loc[:,'kind'] = kind
+#       df_summary = pd.concat([df_summary, tmp], ignore_index=True)
+
+#       for id, row in data.iterrows():
+#           model = row.source_model
+#           country_source = row.source_country
+#           country_target = row.target_country
+#           country_within_code = COUNTRIES[country]['code'] #'SL' if country == 'Sierra Leone' else 'UG'
+#           country_across_code = COUNTRIES[country_target]['code'] #'UG' if country_within_code == 'SL' else 'SL'
+#           var_col = "" if kind =='overall' else f'_{kind}_wi'
+#           within = row[f"{country_within_code}_{metric}{var_col}"]
+#           across = row[f"{country_across_code}_{metric}{var_col}"]
+
+#           index = df_summary.query("model==@model and country==@country and kind==@kind").index
+#           df_summary.loc[index,f"{metric}_within"] = within
+#           df_summary.loc[index,f"{metric}_across"] = across
+#           df_summary.loc[index,'kind'] = f"IWI_{kind}"
+
+#   palette = 'tab20' #tab10
+#   if only['country'] is not None and only['kind'] is not None:
+#     # only 1 country
+#     onlyc = only['country']
+#     onlyk = only['kind'] 
+#     only['kind'] = f'IWI_{onlyk}' if not onlyk.startswith('IWI_') else onlyk
+#     onlyk = only['kind']
+#     df_summary = df_summary.query("country==@onlyc and kind==@onlyk")
+#     markers = ['X']
+#     fg = sns.FacetGrid(data=df_summary.round(2), height=6, aspect=1.2, legend_out=True, sharex=False, sharey=False)
+#     fg.map_dataframe(sns.scatterplot, x=f'{metric}_within', y=f"{metric}_across", 
+#                      hue='model', palette=palette, markers=markers)
+#   else:
+#     # all countries
+#     fg = sns.FacetGrid(data=df_summary.round(2), col='kind',height=3.8, aspect=0.62, 
+#                        legend_out=True, sharex=False, sharey=False)
+#     markers = ['X','o']
+#     fg.map_dataframe(sns.scatterplot, x=f'{metric}_within', y=f"{metric}_across", hue='model', 
+#                      style='country',  palette=palette, markers=markers, s=60)
+#   fg.add_legend()
+#   fg.set_titles(row_template = '{row_name}', col_template = '{col_name}')
+  
+#   ### diagonal
+#   num_cols = [c for c in df_summary.columns if 'within' in c or 'across' in c]
+#   mins = {}
+#   for ax in fg.axes.flatten():
+#     kind = only['kind'] if only['kind'] is not None else ax.get_title()
+#     tmp = df_summary.query("kind==@kind").copy()
+#     mi, ma = tmp[num_cols].min().min(), tmp[num_cols].max().max()
+#     ax.plot([mi,ma],[mi,ma],ls='solid',c='grey',lw=1,zorder=0)
+#     mins[kind] = mi
+
+#   ### best metadata-single
+#   for ax in fg.axes.flatten():
+#     kind = only['kind'] if only['kind'] is not None else ax.get_title()
+#     mi = df_summary.query("kind==@kind")[num_cols].min().min()
+#     for country,marker in zip(*[df_dr.country.unique(),markers]):
+#       tmp = df_dr.query("country==@country and recency==@RECENCY_BEST \
+#                          and relocation==@RELOCATION_BEST and features not in @MAIN_FEATURES").groupby(['model','features']).mean().reset_index()
+      
+#       for m in ['max','min']:
+#         tmp2 = tmp[tmp[metric]==tmp[metric].min()].reset_index(drop=True) if m=='min' else tmp[tmp[metric]==tmp[metric].max()].reset_index(drop=True)
+#         var_col = metric if kind=='overall' else f'{metric}_{kind}_wi'
+#         val = tmp2.iloc[0][var_col.replace('IWI_','')]
+        
+#         subi = FEATURE_MAP[tmp2.iloc[0].features]
+#         c = 'grey'
+        
+#         ax.plot([mins[kind],val], [val,val], ls='dotted', color=c, zorder=0, lw=1)
+#         ax.plot([val,val], [mins[kind],val], ls='dotted', color=c, zorder=0, lw=1)
+#         ax.plot([val],[mins[kind]], marker=marker, markersize=7, markerfacecolor='black', markeredgecolor='white')
+        
+#         y = 0.085
+#         if m == 'max':
+#           ha = 'right' if COUNTRIES[country]['code']=='SL' else 'left' if COUNTRIES[country]['code']=='UG' else 'center'
+#         else:
+#           special = COUNTRIES[country]['code']=='SL' and m=='min' and kind=='IWI_mean'
+#           ha = 'center' if special else 'left'
+#           y = -0.06 if special else y
+#         ax.text(s=subi, x=val, y=y, ha=ha, va='center', c=c, transform=ax.get_xaxis_transform())
+  
+#   fg.set_xlabels(f"{metric.upper()} within-country")
+#   fg.set_ylabels(f"{metric.upper()} cross-country")
+  
+#   add_panel_labels(fg)
+#   plt.tight_layout()
+#   plt.subplots_adjust(wspace=0.25, hspace=0.25)
+#   sns.move_legend(fg, "upper left", bbox_to_anchor=(0.935, 0.99), handletextpad=0.1)
+
+#   #plt.subplots_adjust(wspace=0.2, hspace=0.2)
+  
+#   ### savefig
+#   if output is not None:
+#     fn = os.path.join(output,f"cross_country_performance_{metric}.pdf")
+#     fg.savefig(fn, dpi=300)
+#     print(f"{fn} saved!")
+  
+#   plt.show()
+#   plt.close()
+  
+    
