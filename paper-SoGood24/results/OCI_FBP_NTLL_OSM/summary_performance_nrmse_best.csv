@@ -1,0 +1,37 @@
+,country,configuration,nrmse_mean,nrmse_std,nrmse_mean_wi_mean,nrmse_mean_wi_std,nrmse_std_wi_mean,nrmse_std_wi_std,kind
+0,Gabon,ON,0.67,0.03,0.44,0.04,0.9,0.03,recency
+1,Liberia,ON,0.68,0.03,0.48,0.07,0.88,0.03,recency
+2,Rwanda,ON,0.74,0.02,0.57,0.01,0.9,0.03,recency
+3,Sierra Leone,ON,0.61,0.03,0.44,0.02,0.78,0.04,recency
+4,South Africa,ON,0.82,0.03,0.75,0.04,0.89,0.03,recency
+5,Uganda,ON,0.65,0.04,0.47,0.04,0.83,0.03,recency
+0,Gabon,none,0.67,0.03,0.44,0.04,0.9,0.03,relocation
+3,Liberia,none,0.68,0.03,0.48,0.07,0.88,0.03,relocation
+6,Rwanda,none,0.74,0.02,0.57,0.01,0.9,0.03,relocation
+9,Sierra Leone,none,0.61,0.03,0.44,0.02,0.78,0.04,relocation
+12,South Africa,none,0.82,0.03,0.75,0.04,0.89,0.03,relocation
+15,Uganda,none,0.65,0.04,0.47,0.04,0.83,0.03,relocation
+0,Gabon,no,0.85,0.05,0.61,0.05,1.08,0.05,augmented
+1,Gabon,yes,0.85,0.07,0.61,0.03,1.09,0.11,augmented
+3,Liberia,yes,0.71,0.05,0.56,0.03,0.85,0.06,augmented
+2,Liberia,no,0.77,0.02,0.6,0.03,0.93,0.02,augmented
+5,Rwanda,yes,0.85,0.02,0.71,0.03,0.99,0.01,augmented
+4,Rwanda,no,0.98,0.11,0.76,0.03,1.21,0.2,augmented
+6,Sierra Leone,no,0.74,0.02,0.57,0.04,0.9,0.03,augmented
+7,Sierra Leone,yes,0.76,0.01,0.59,0.06,0.94,0.07,augmented
+9,South Africa,yes,0.89,0.03,0.83,0.02,0.96,0.03,augmented
+8,South Africa,no,0.91,0.01,0.85,0.01,0.97,0.0,augmented
+11,Uganda,yes,0.75,0.03,0.59,0.03,0.91,0.02,augmented
+10,Uganda,no,0.77,0.01,0.6,0.02,0.94,0.04,augmented
+0,Gabon,no,0.67,0.03,0.44,0.04,0.9,0.03,weighted
+1,Gabon,yes,0.68,0.04,0.43,0.04,0.94,0.09,weighted
+2,Liberia,no,0.68,0.03,0.48,0.07,0.88,0.03,weighted
+3,Liberia,yes,0.69,0.01,0.5,0.05,0.89,0.04,weighted
+4,Rwanda,no,0.74,0.02,0.57,0.01,0.9,0.03,weighted
+5,Rwanda,yes,0.74,0.05,0.57,0.04,0.91,0.06,weighted
+6,Sierra Leone,no,0.61,0.03,0.44,0.02,0.78,0.04,weighted
+7,Sierra Leone,yes,0.61,0.02,0.44,0.01,0.78,0.03,weighted
+8,South Africa,no,0.82,0.03,0.75,0.04,0.89,0.03,weighted
+9,South Africa,yes,0.82,0.02,0.75,0.02,0.89,0.03,weighted
+11,Uganda,yes,0.64,0.03,0.46,0.04,0.83,0.02,weighted
+10,Uganda,no,0.65,0.04,0.47,0.04,0.83,0.03,weighted
