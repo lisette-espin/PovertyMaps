@@ -4,7 +4,7 @@ Interpreting wealth distribution via poverty map inference using multimodal data
 [![Python 3.7](https://img.shields.io/badge/python-3.7-blue.svg)](https://www.python.org/downloads/release/python-3710/)
 
 <picture>
-<img width="888" alt="screenshot" src="paper/main-plots/CNN_CB_model_v6.png">
+<img width="888" alt="screenshot" src="paper-WWW23/main-plots/CNN_CB_model_v6.png">
 </picture>
 
 ## Analysis (plots)
