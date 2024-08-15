@@ -13,17 +13,20 @@ from census.ingatlan import INGATLAN
 from utils import viz
 from utils import ios
 from utils import validations
+from utils.constants import GT_SOURCES
 
 ###############################################################################
 # Functions
 ###############################################################################
 
 def get_instance(root, code, years, **kwargs):
-  if code in ['SL','UG','ZW']:
+  ava = GT_SOURCES
+  
+  if code in ava['dhs']:
     return DHSMIS(root,code, years, **kwargs)
-  if code in ['EC']:
+  if code in ava['enemdu']:
     return ENEMDU(root,code, years, **kwargs)
-  if code in ['HU']:
+  if code in ava['ingatlan']:
     return INGATLAN(root,code, years, **kwargs)
   raise Exception("code does not exist.")
 

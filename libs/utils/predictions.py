@@ -109,8 +109,18 @@ def runGradientBoostingDecisionTreeClassifier(X, y):
   gb_clf2.fit(X_train, y_train)
   y_pred = gb_clf2.predict(X_val)
 
+  # print("Confusion Matrix:")
+  # print(confusion_matrix(y_val, y_pred))
+
   print("Classification Report")
   print(classification_report(y_val, y_pred))
+
+  ### Plot
+  # mx = np.concatenate((y_pred, y_val)).max()
+  # plt.scatter(y_pred, y_val)
+  # plt.plot([0,mx+1],[0,mx+1],ls='--',c='grey')
+  # _ = plt.xlabel('pred')
+  # _ = plt.ylabel('true')
 
   ### confusion matrix plot
   plot_confusion_matrix(gb_clf2, X_val, y_val)  

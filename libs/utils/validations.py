@@ -148,6 +148,11 @@ def validate_source(source, model=None):
     if source in FEATURE_SOURCES and model not in ['CB', 'xgb', 'xgb-{source}', 'catboost']:
       raise Exception ("Not a valid model")
     
+def validate_y_attribute(var):
+  if var not in ['mean', 'std']:
+    raise Exception ("Not a valid y_attribute.")
+  return True  
+
 ##############################################################################################################
 # OpenCellId
 ##############################################################################################################
@@ -277,3 +282,4 @@ def get_seconds_to_wait_to_target(ccode, intervals, verbose=True):
     print(f"Your current time is {t0}.")
     print(f"- Waiting {waiting_time} until it is {t3} in your current time.")
   return waiting_time
+

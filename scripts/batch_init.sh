@@ -51,8 +51,10 @@ echo "params: -r $root -c $code -y $years -n $njobs -l $load -g $gsize -f $shift
 echo "LOG FILE: $fnlog"
 
 ###########################################################################################################
+#"SL" "UG" "ZW"
+#"HU"
 
-ccodes=("SL" "UG" "ZW")
+ccodes=("RW" "LB" "SL" "UG" "GA" "ZW" "HU" "ZA")
 for i in "${ccodes[@]}"
 do
     if [ "$i" == "$code" ] ; then

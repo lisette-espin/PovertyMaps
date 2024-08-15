@@ -27,7 +27,9 @@ def check_gpu():
   print("GPU is", "available" if tf.config.list_physical_devices('GPU') else "NOT AVAILABLE")
   print("===================================================")        
   os.environ["TF_GPU_ALLOCATOR"]="cuda_malloc_async"
+ # os.environ["TF_CPP_VMODULE"]="gpu_process_state=10,gpu_cudamallocasync_allocator=10"
   print(os.environ["TF_GPU_ALLOCATOR"])
+  #print(os.environ["TF_CPP_VMODULE"])
   print("===================================================")   
   K.clear_session()
   print('clear session')
@@ -35,6 +37,7 @@ def check_gpu():
   
   if len(tf.config.list_physical_devices('GPU'))==0:
     print("There is no GPU activated.")
+    #raise Exception("There is no GPU activated.") ############################# UNCOMMENT THIS LINE
   else:
     subprocess.call(['nvidia-smi']) 
     print("GPU is ready!")

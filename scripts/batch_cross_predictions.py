@@ -28,7 +28,7 @@ from utils import constants
 from utils.augmentation import RandomColorDistortion
 
 ROOT = '../data'
-COUNTRIES = {k:v for k,v in constants.COUNTRIES.items() if k in ['Sierra Leone','Uganda','Hungary']}
+COUNTRIES = {k:v for k,v in constants.COUNTRIES.items() if k in ['Sierra Leone','Liberia','Rwanda','Uganda','Gabon','South Africa']}
 MODELS = OrderedDict({'catboost':'CB', 
                       'weighted_catboost':'CB$_w$', 
                       'cnn':'CNN', 
@@ -40,7 +40,9 @@ MODELS = OrderedDict({'catboost':'CB',
 MODELS_CB = [MODELS['catboost'], MODELS['weighted_catboost']]
 MODELS_CNN = [MODELS['cnn'], MODELS['cnn_aug']]
 MODELS_FMAP = [MODELS['cnn+catboost'], MODELS['cnn+weighted_catboost'], MODELS['cnn_aug+catboost'], MODELS['cnn_aug+weighted_catboost']]
-RESULTS = '../paper/results/'
+
+VALID_FEATURE_SOURCES = 'OCI_FBP_NTLL_OSM' # 'all' 'OCI_FBM_FBP_NTLL_OSM'
+RESULTS = f'../paper/results/{VALID_FEATURE_SOURCES}'
 OUTPUT = os.path.join(RESULTS, 'cross_modeling_fmaps')
 
 #################################################################################
@@ -84,8 +86,6 @@ def cross_country_prediction(source_country, target_country):
 
   files = files_1 + files_2 + files_3 + files_4 
   
-  files = [fn for fn in files if 'xgb' in fn and 'cnn' not in fn] ### DELETE THIS LINE
-  
   print(f"[INFO] {len(files)} models to load from {root_models}.")
 
   # results
@@ -101,8 +101,9 @@ def cross_country_prediction(source_country, target_country):
     offlineaug = False # because test set does not get augmented
     is_reg = True
     features_source = model_fn.split("/xgb-")[-1].split('/')[0] if 'xgb-' in model_fn else None
-    if features_source is not None and features_source!='all':
+    if features_source is not None and features_source!=VALID_FEATURE_SOURCES:
       continue
+    print("features_source:", features_source)
     cv = 4
     include_fmaps = '_cnn_' in model_fn and 'xgb-' in model_fn
     weighted = 'weighted' in model_fn
@@ -386,7 +387,9 @@ def ccp_cb(model_fn, model_name, source_country, target_country, root, years, dh
       y = tmp.loc[:,[f"true_{c}" for c in y_attribute.split(',')]].values
     else:
       # building features X's for catboost
-      X, y, feature_names = data.metadata_get_X_y(df=test, y_attribute=y_attribute, fmaps=fmaps, offlineaug=offlineaug, features_source=features_source, timevar=timevar)
+      print(features_source)
+      X, y, feature_names = data.metadata_get_X_y(df=test, y_attribute=y_attribute, fmaps=fmaps, 
+                                                  offlineaug=offlineaug, features_source=features_source, timevar=timevar)
       print(type(X), X.shape, type(y), y.shape, feature_names)
 
       np.random.seed(source_rs)
@@ -443,6 +446,9 @@ def ccp_cb(model_fn, model_name, source_country, target_country, root, years, dh
 #################################################################################
 #
 #################################################################################
+
+# export PYTHONPATH="${PYTHONPATH}:../libs"
+# conda activate tf2-gpu-2023
 
 if __name__ == '__main__':
   run()

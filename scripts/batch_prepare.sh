@@ -17,7 +17,7 @@ mkdir -p "$folder/cache/FBMPP"
 mkdir -p "$folder/cache/VIIRS"
 mkdir -p "$folder/cache/VIIRSPP"
 mkdir -p "$folder/connectivity"
-mkdir -p "$folder/movement/Facebook"
+mkdir -p "$folder/movement/Facebook" # << @DEPRECATED
 mkdir -p "$folder/other"
 mkdir -p "$folder/population/Facebook"
 mkdir -p "$folder/population/OCHA"
@@ -34,8 +34,9 @@ mkdir -p "$folder/results/samples"
 # cells, movement, population, survey
 cp -r "../resources/survey/$country/"* "$folder/survey/"
 cp "../resources/OpenCellid/country/cell_towers_$country".csv "$folder/connectivity/"
-cp "../resources/Facebook/Movement/$country/"*_csv.zip "$folder/movement/Facebook/"
+cp "../resources/Facebook/Movement/$country/"*_csv.zip "$folder/movement/Facebook/" # <<<<<<<<<<<<<<<<<< @DEPRECATED
 cp "../resources/Facebook/Population/$country/"*_general_2020_csv.zip "$folder/population/Facebook/"
+cp "../resources/OCHA/Population/$country/"*_geojson.zip "$folder/population/OCHA/"
 
 # Google earth engine auth (not needed anymore, now we use client_secret as param)
 #echo "./auth_gee.sh"

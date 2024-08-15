@@ -8,6 +8,7 @@
 # Dependencies
 ################################################################################
 
+import re
 import os
 import glob
 import time
@@ -87,6 +88,7 @@ class FacebookMarketing(object):
   EDU_PHD = {'education_statuses':[11]}
   ### INSTERESTS
   INTEREST_CASINO = {'interests':[{'id':6003248338072, 'name':'Casino games'},{'id':6003012317397, 'name':'Gambling'}]}
+  
   ### DISTACE_UNITS
   UNIT_KM = 'kilometer'
   UNIT_ML = 'mile'
@@ -106,7 +108,7 @@ class FacebookMarketing(object):
     self.appsecret_proof = self.fb_session._gen_appsecret_proof()  
     FacebookAdsApi.init(access_token=self.access_token, api_version=api_version)
 
-  def extract_reach_estimate(self, lon, lat, ccode, radius=1.0, unit=UNIT_KM, specific_params=None, cache_dir='/mydrive/cache'):
+  def extract_reach_estimate(self, lon, lat, ccode, radius=1.0, unit=UNIT_KM, specific_params=None, cache_dir='/mydrive/cache', include_location_types=True):
     '''
     Potential reach (the number of monthly active people) on Facebook that match 
     the audience you defined through your audience targeting selections.
@@ -117,7 +119,7 @@ class FacebookMarketing(object):
     
     status = needs_to_be_queried(results)
     if status == FBM_LOADED_DONE:
-      #print(f"DONE: {len(results)}")
+      # print(f"DONE: {len(results)}")
       return get_value(results), FBM_LOADED_DONE
     elif status == FBM_NEEDS_QUERY:
       pass
@@ -127,8 +129,7 @@ class FacebookMarketing(object):
       raise Exception("[ERROR] marketing.py | extract_reach_estimate | something went wrong (status).")
       
     fields = []
-    params = {'targeting_spec': {'geo_locations':{'custom_locations':[{'latitude': lat, 'longitude': lon, 'radius': radius, 'distance_unit': unit}], 
-                                                  "location_types":["home"]},
+    params = {'targeting_spec': {'geo_locations':{'custom_locations':[{'latitude': lat, 'longitude': lon, 'radius': radius, 'distance_unit': unit}]},
                                  'age_min':13,'age_max':65},
               'appsecret_proof': self.appsecret_proof,
               'optimization_goal':'REACH'} # 'optimization_goal':'REACH' # only for get_delivery_estimate 
@@ -136,10 +137,13 @@ class FacebookMarketing(object):
     if specific_params is not None:
       params['targeting_spec'].update(specific_params)
     
+    if include_location_types:
+     params['targeting_spec']['geo_locations']['location_types'] = ["home"]
+        
     try:
       # get_reach_estimate --> MAU monthly active users
       # get_delivery_estimate --> MAU & DAU monthly and daily active users
-      result = AdAccount(self.ad_account_id).get_delivery_estimate(fields=fields,params=params)
+      result = AdAccount(self.ad_account_id).get_delivery_estimate(fields=fields, params=params)
       code = FBM_QUERIED
     except FacebookRequestError as fex:
       #code:100  subcode:1487851 (wrong location)
@@ -253,18 +257,31 @@ class FacebookMarketing(object):
             'FBM_casino':FacebookMarketing.INTEREST_CASINO}
 
   @staticmethod
-  def load_tokens(tokens_dir):
+  def load_tokens(tokens_dir, create_seq_id=True):
     files = sorted([os.path.join(d,fn) for d in glob.glob(tokens_dir) for fn in os.listdir(d) if fn.startswith('tokens-') and fn.endswith('.json')])
+    
+    # files = sorted(files)
+    # np.random.shuffle(files)
+    
     ios.printf(f"{len(files)} tokens loaded")
     # files = sorted([fn for fn in os.listdir(tokens_dir) if fn.endswith(".json") or os.path.isfile(os.path.join(tokens_dir,fn))])
 
     tokens = {}
     for id, fn in enumerate(files):
-      #fn = os.path.join(tokens_dir,fn)
+      fname = os.path.basename(fn)
+      if create_seq_id:
+        id += 1
+      else:
+        try: 
+          id = int(re.findall(r'\d+', fname)[0])
+        except:
+          id += 1
+       
       try:
         obj = ios.load_json(fn)
         if obj is not None:          
-          tokens[id+1] = obj
+          obj['fn'] = fname
+          tokens[id] = obj
       except Exception as ex:
         print(ex)
         pass
@@ -278,11 +295,13 @@ class FacebookMarketing(object):
                                                 # constraint for each token)
     df_places = df_places.loc[:,[id, lon,lat]]
 
-    tokens = FacebookMarketing.load_tokens(tokens_dir)
+    tokens = FacebookMarketing.load_tokens(tokens_dir, create_seq_id=True)
     maxtokens = len(tokens)
     ios.printf(f"{maxtokens} tokens loaded.")
     tokenids = cycle(np.arange(1,maxtokens+1,1))
     status = defaultdict(int)
+    
+    include_location_types = float(FBM_API_VERSION.replace("v",''))<19.0
     
     tokenid = next(tokenids)
     ts = validations.get_current_time_in_country(ccode)
@@ -301,7 +320,7 @@ class FacebookMarketing(object):
         #print(k, v, code)
         
         while code == FBM_QUOTA:
-          value, code = fbm.extract_reach_estimate(lon=row[lon], lat=row[lat], ccode=ccode, radius=radius, unit=unit, specific_params=v, cache_dir=cache_dir) 
+          value, code = fbm.extract_reach_estimate(lon=row[lon], lat=row[lat], ccode=ccode, radius=radius, unit=unit, specific_params=v, cache_dir=cache_dir, include_location_types=include_location_types) 
 
           status[tokenid] = code == FBM_QUOTA
 
@@ -337,7 +356,7 @@ class FacebookMarketing(object):
             
             # Load tokens (to allow for new tokens)
             if tokenid == 1:
-              tokens = FacebookMarketing.load_tokens(tokens_dir)
+              tokens = FacebookMarketing.load_tokens(tokens_dir, create_seq_id=True)
               maxtokens = len(tokens)
               tokenids = cycle(np.arange(1,maxtokens+1,1))
               tokenid = next(tokenids)
@@ -420,7 +439,7 @@ def fbconnect(tokens, tokenid, ts):
                           access_token=access_token,
                           ad_account_id=ad_account_id,
                           timestamp=f"{ts}")
-  fbm.init()
+  fbm.init(api_version=FBM_API_VERSION)
   return fbm
 
 

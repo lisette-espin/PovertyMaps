@@ -267,10 +267,3 @@ def model_cnn_mp_dp_relu_sigmoid_adam_mean_std_regression(params):
   model.compile(optimizer=opt, loss=LOSS_REGRESSION, metrics=METRICS_REGRESSION)
   return model
 
-
-# def get_Keras_model(modelname):
-#   if modelname.endswith('_regression') or modelname in ['aug_cnn_mp_dp_relu_sigmoid_adam_mean_regression', 'aug_cnn_mp_dp_relu_sigmoid_adam_mean_std_regression']:
-#     print('Regressor')
-#     return KerasRegressor
-#   print('Classifier')
-#   return KerasClassifier

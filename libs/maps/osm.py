@@ -62,7 +62,7 @@ ZOOM_BUILDINGS = 18
 ZOOM_POIS = 18
 SLEEP = 10
 MAX_TRIES = 10
-
+('isolated_dwelling', 'town', 'village', 'hamlet', 'city')
 TAGS = {'place':['city','town','neighbourhood','village','hamlet','isolated_dwelling'],
         'highway':['primary', 'primary_link', 'secondary', 'secondary_link', 'tertiary', 'tertiary_link', 'trunk', 'trunk_link', 'motorway'],
         'amenity':['bar','cafe','fast_food','pub','college','kindergarten','library','school','university','bus_station','atm','bank','clinic','dentist','hospital','pharmacy','veterinari','cinema','community_centre','courthouse','embassy','marketplace','police','townhall']
@@ -88,12 +88,14 @@ class OSM(object):
     self.pois = []
     self.bbox = []
 
-  def get_populated_places_by_country(self, country, fn, load=False, cache_dir='/mydrive/cache'):
+    
+  def get_populated_places_by_country(self, country, ccode3, fn, load=False, cache_dir='/mydrive/cache'):
     '''
     Loads into self.ppl all populated places found in a country using OSM.
     Such places must be of any tag within TAGS['place'].
 
-    @param country: country label/name/initials
+    @param country: country name
+    @param ccode3: 3-letter country code name
     @param fn: file path where to store dataframe
     @param cache_dir: directory where to cache OSM data
     @return 
@@ -108,7 +110,7 @@ class OSM(object):
     ### osm area id
     CachingStrategy.use(JSON, cacheDir=cache_dir)
     nominatim = Nominatim()
-    area_id = nominatim.query(country).areaId()
+    area_id = nominatim.query(country, countrycodes=ccode3).areaId()
 
     ### query
     kind = 'place'
@@ -136,9 +138,11 @@ class OSM(object):
       else:
         break
     
+    print(f"results: {len(results)}")
+    
     for r in tqdm(results):
       obj = r['tags']
-      obj[OSMID] = r['id']
+      obj[OSMID] = int(r['id'])
       obj[LAT] = r['lat']
       obj[LON] = r['lon']
       obj['type'] = r['type']
@@ -397,56 +401,3 @@ class OSM(object):
     return unary_union(junctions)
 
   
-### osm area id
-# q = OSM.query_nominatim(lat=lat, lon=lon, reverse=True, zoom=ZOOM_MAJOR_AND_MINOR_STREETS, cacheDir=cache_dir)
-# # nominatim = Nominatim(cacheDir=cache_dir)
-# # q = nominatim.query(lat, lon, reverse=True, zoom=ZOOM_MAJOR_AND_MINOR_STREETS).toJSON()
-
-# if len(q) > 1:
-#   print(len(q))
-#   print(q)
-#   raise Exception("Should this happen?")
-
-# #info = q[0]
-# #bbox = info['boundingbox']
-# #bbox = [float(bbox[0]),float(bbox[2]),float(bbox[1]),float(bbox[3])]
-
-
-#def get_one_mile_bbox(clat, clon):
-    # '''
-    # @TODO: Find a better way to compute a lat,lon from clat,clon + distance
-    # '''
-    # centroid = Point(clon, clat)
-    # wh = 1609.34 # width and height of bbx of 1 mile (1609.34 meters)
-    # distance = wh / 2.
-    # geod = Geod(ellps="WGS84")
-
-    # lat1 = clat
-    # while True:
-    #   lat1 -= 0.00001
-    #   d = geod.geometry_length(LineString([centroid, Point(clon,lat1)])) # in meters
-    #   if d >= int(distance)-1 and d <= int(distance)+1:
-    #     break
-
-    # lat2 = clat
-    # while True:
-    #   lat2 += 0.00001
-    #   d = geod.geometry_length(LineString([centroid, Point(clon,lat2)])) # in meters
-    #   if d >= int(distance)-1 and d <= int(distance)+1:
-    #     break
-
-    # lon1 = clon
-    # while True:
-    #   lon1 -= 0.00001
-    #   d = geod.geometry_length(LineString([centroid, Point(lon1,clat)])) # in meters
-    #   if d >= int(distance)-1 and d <= int(distance)+1:
-    #     break
-
-    # lon2 = clon
-    # while True:
-    #   lon2 += 0.00001
-    #   d = geod.geometry_length(LineString([centroid, Point(lon2,clat)])) # in meters
-    #   if d >= int(distance)-1 and d <= int(distance)+1:
-    #     break
-
-    # return [lat1, lon1, lat2, lon2]

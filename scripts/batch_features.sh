@@ -83,30 +83,30 @@ echo "====================================================================" 2>&1
 echo "python batch_nightlights.py -r $root -y $years -m $meters -a $apikey -p $projectid -s $servicename" -c "$clientsecret" 2>&1 | tee -a "$fnlog"
 python batch_nightlights.py -r "$root" -y "$years" -m "$meters" -a "$apikey" -p "$projectid" -s "$servicename" -c "$clientsecret" 2>&1 | tee -a "$fnlog"
 
-# 4. Load cell-antennas 
+# # 4. Load cell-antennas 
 echo "====================================================================" 2>&1 | tee -a "$fnlog"
 echo "python batch_cells.py -r $root -y $years -d $distance -m $meters" 2>&1 | tee -a "$fnlog"
 python batch_cells.py -r "$root" -y "$years" -d $distance -m $meters 2>&1 | tee -a "$fnlog"
 
-# 5. Get Facebook Movement features
-echo "====================================================================" 2>&1 | tee -a "$fnlog"
-echo "python batch_movement.py -r $root -y $years -j $njobs" 2>&1 | tee -a "$fnlog"
-python batch_movement.py -r "$root" -y "$years" -j $njobs 2>&1 | tee -a "$fnlog"
+# # # 5. Get Facebook Movement features (UPDATE: 2023-12-31, NOT USED, DISCONTINUED)
+# # echo "====================================================================" 2>&1 | tee -a "$fnlog"
+# # echo "python batch_movement.py -r $root -y $years -j $njobs" 2>&1 | tee -a "$fnlog"
+# # python batch_movement.py -r "$root" -y "$years" -j $njobs 2>&1 | tee -a "$fnlog"
 
 # 6. Get satellite images features
 echo "====================================================================" 2>&1 | tee -a "$fnlog"
 echo "python batch_staticmaps.py -r $root -y $years -z $size -s $secretfn -k $keyfn" 2>&1 | tee -a "$fnlog"
 python batch_staticmaps.py -r "$root" -y "$years" -z "$size" -s "$secretfn" -k "$keyfn" 2>&1 | tee -a "$fnlog"
 
-# 7. Get OpenStreetMap features
+# # 7. Get OpenStreetMap features
 echo "====================================================================" 2>&1 | tee -a "$fnlog"
 echo "python batch_osm.py -r $root -y $years -w $width" 2>&1 | tee -a "$fnlog"
 python batch_osm.py -r "$root" -y "$years" -w $width 2>&1 | tee -a "$fnlog"
 
-# 8. Get Facebook Marketing API features
-echo "====================================================================" 2>&1 | tee -a "$fnlog"
-echo "python batch_marketing.py -r $root -y $years -t $tokensdir -i $radius -u $unit" 2>&1 | tee -a "$fnlog"
-python batch_marketing.py -r "$root" -y "$years" -t "$tokensdir" -i $radius -u "$unit" 2>&1 | tee -a "$fnlog"
+# # # 8. Get Facebook Marketing API features (UPDATE: 2024-05, NOT USED IN AFRICA reach_estimates CHANGED conceptually)
+# # echo "====================================================================" 2>&1 | tee -a "$fnlog"
+# # echo "python batch_marketing.py -r $root -y $years -t $tokensdir -i $radius -u $unit" 2>&1 | tee -a "$fnlog"
+# # python batch_marketing.py -r "$root" -y "$years" -t "$tokensdir" -i $radius -u "$unit" 2>&1 | tee -a "$fnlog"
 
 # 9. end
 echo "====================================================================" 2>&1 | tee -a "$fnlog"

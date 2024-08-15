@@ -24,7 +24,7 @@ while getopts ":r:c:y:l:t:a:f:i:k:v:n:e:w" opt; do
     ;;
     a) yatt="$OPTARG"    # comma-separated attributes: mean_wi, std_wi
     ;;
-    f) fsource="$OPTARG" # all, OCI, FBM, FBP, FBMV, NTLL, OSM
+    f) fsource="$OPTARG" # all, OCI, FBM, FBP, FBMV, NTLL, OSM. Also OCI_FBM or OCI,FBM (comma or underscore separated WITHOUT SPACE)
     ;;
     i) timevar="$OPTARG" # none, deltatime, gdp, gdpp, gdppg, gdppgp, gdpg, gdpgp, gni, gnip
     ;;
@@ -60,7 +60,7 @@ echo "LOG FILE: $fnlog"
 
 ###########################################################################################################
 
-ccodes=("SL" "UG" "ZW")
+ccodes=("SL" "UG" "ZW" "HU" "RW" "LB" "GA" "ZA")
 for i in "${ccodes[@]}"
 do
     if [ "$i" == "$code" ] ; then

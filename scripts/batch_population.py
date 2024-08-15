@@ -17,7 +17,7 @@ from utils import validations
 # Functions
 ###############################################################################
 
-def run(root, years, meters):
+def run(root, years, meters, n_jobs=1):
   # validation
   validations.validate_not_empty(root,'root')
   meters = validations.validate_meters(meters)
@@ -40,7 +40,7 @@ def run(root, years, meters):
     
   # update features  
   print('Updating features...')
-  df_places_new = fb.update_population_features(meters)
+  df_places_new = fb.update_population_features(meters, n_jobs)
   print(df_places_new.head(1))
   print(df_places_new.shape)
 
@@ -57,11 +57,12 @@ if __name__ == "__main__":
     parser.add_argument("-r", help="Country's main folder.", type=str, required=True)
     parser.add_argument("-y", help="Year or years separated by comma (E.g. 2016,2019).", type=str, required=False, default=None)
     parser.add_argument("-m", help="Comma separated bbox width (eg. 1000,2000,3000).", type=str, default=None, required=False)
+    parser.add_argument("-n", help="Number of jobs to run in parallel (tree search), eg. 10", type=int, default=1)
     
     args = parser.parse_args()
     for arg in vars(args):
       print("{}: {}".format(arg, getattr(args, arg)))
     start_time = time.time()
     
-    run(args.r, args.y, args.m)
+    run(args.r, args.y, args.m, args.n)
     print("--- %s seconds ---" % (time.time() - start_time))

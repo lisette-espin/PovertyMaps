@@ -2,11 +2,14 @@
 export PYTHONPATH="${PYTHONPATH}:../libs"
 
 # 1. Load parameters (arguments)
-while getopts ":r:y:s:k:" opt; do
+size='' # string WxH. W: width, H: heigh, both in pixels (x must be included)
+while getopts ":r:y:z:s:k:" opt; do
   case $opt in
     r) root="$OPTARG"
     ;;
     y) years="$OPTARG"
+    ;;
+    z) size="$OPTARG"
     ;;
     s) secretfn="$OPTARG"
     ;;
@@ -17,7 +20,7 @@ while getopts ":r:y:s:k:" opt; do
   esac
 done
 
-echo "python batch_staticmaps.py -r $root -y $years -s $secretfn -k $keyfn"
+echo "python batch_staticmaps.py -r $root -y $years -z $size -s $secretfn -k $keyfn"
 
 # 2. Get OpenStreetMap features
-python batch_staticmaps.py -r "$root" -y "$years" -s "$secretfn" -k "$keyfn"
+python batch_staticmaps.py -r "$root" -y "$years" -z "$size" -s "$secretfn" -k "$keyfn"

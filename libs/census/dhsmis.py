@@ -74,6 +74,7 @@ from utils.constants import CONSTANT
 
 from utils.constants import COLS_SURVEY
 from utils.constants import COLS_CLUSTER
+from utils.constants import EXPENSIVE_UTENSILS_COLS
 
 ##############################################################################
 # CLASS
@@ -92,7 +93,7 @@ class DHSMIS(WI):
     super().load_data()
     self._load_surveys()
 
-  def commpute_indicators(self, njobs=1):
+  def compute_indicators(self, njobs=1):
     self._compute_IWI(njobs)
 
   def rename_columns(self):
@@ -125,11 +126,15 @@ class DHSMIS(WI):
     self._load_clusters()
     
   def _load_households(self):
-
+    print("loading households")
+  
     ### 1. reading stata file
     df_survey = None
     for year in tqdm(self.years):
-      for fn in glob.glob(os.path.join(self.root,f"survey/*/{year}/{self.country_code}HR*")):
+      
+      _path = os.path.join(self.root,f"survey/*/{year}/{self.country_code}HR*")
+      
+      for fn in glob.glob(_path):
           
         if 'LSMS' in fn:
           continue
@@ -156,15 +161,21 @@ class DHSMIS(WI):
 
         df_survey = tmp.copy() if df_survey is None else df_survey.append(tmp, ignore_index=True)
 
-    ### 2. drop nan
+    print("- Households: ", df_survey.shape[0])
+    
+    ### 2. replace nan only for bool columns:
+    df_survey.fillna(value={c:0 for c in EXPENSIVE_UTENSILS_COLS}, inplace=True)
+    print(df_survey.head(2))
+    
+    ### 3. drop nan
     self.df_survey = df_survey.dropna(subset=COLS_SURVEY)
     del(df_survey)
     gc.collect()
 
-    ### 3. remove refugee data
+    ### 5. remove refugee data
     self.df_survey = self.df_survey.query("hv025 in [1,2]").copy() # 3 is for refugee
 
-    ### 4. cast types
+    ### 6. cast types
     bool_cols = ['hv208','hv209','hv221','hv243a','hv212','hv210','hv206','hv243e','hv211','hv243d']
     self.df_survey.loc[:,bool_cols] = self.df_survey.loc[:,bool_cols].astype(np.bool)
     
@@ -176,7 +187,7 @@ class DHSMIS(WI):
     
 
   def _load_clusters(self):
-    print("loading cluster")
+    print("loading clusters")
     
     ### 1. reading shape files
     self.df_cluster = gpd.GeoDataFrame()
@@ -184,18 +195,31 @@ class DHSMIS(WI):
       for fn in glob.glob(os.path.join(self.root,f"survey/*/{year}/{self.country_code}GE*")):
         if fn.endswith(".zip"):
           pass
+        
+          # data = open(fn, 'rb').read()
+          # with ZipMemoryFile(data) as zip:
+          #   fname = f"{fn.split('/')[-1].replace('.zip','')}.shp"
+          #   with zip.open(fname) as collection:
+          #     print('collection',collection)
+            
+          ## this used to work: Now it's not necessary
+          # fname = os.path.basename(fn).replace('.zip','')
+          # fn = f"zip:///{fn}!{fname}.shp"
+          
         else:
           fn = glob.glob(os.path.join(self.root,f"survey/*/{year}/{self.country_code}GE*/{self.country_code}GE*.shp"))[0]
         
         tmp = gpd.read_file(fn)
         tmp.loc[:,'SURVEY'] = fn.split("/survey/")[-1].split('/')[0]
-        self.df_cluster = self.df_cluster.append(tmp, ignore_index=True)
-    
+        self.df_cluster = pd.concat([self.df_cluster, tmp], ignore_index=True) #self.df_cluster.append(tmp, ignore_index=True)
+        
     ### 2. validate
+    print("- Clusters: ", self.df_cluster.shape[0])
     self.df_cluster.loc[:,'DHSYEAR'] = self.df_cluster.DHSYEAR.astype(np.int16)
     self.df_cluster.loc[:,'DHSCLUST'] = self.df_cluster.DHSCLUST.astype(np.int16)
-    self.df_cluster.loc[:,'URBAN_RURA'] = self.df_cluster.URBAN_RURA.apply(lambda c: 0 if c=='U' else 1 if c=='R' else -1).astype(np.int16) 
-    # -1 never happens (3 is refugee but is filter out in survey)
+    #self.df_cluster.loc[:,'URBAN_RURA'] = self.df_cluster.URBAN_RURA.apply(lambda c: 1 if c=='U' else 2 if c=='R' else 0).astype(np.int16)
+    self.df_cluster.loc[:,'URBAN_RURA'] = self.df_cluster.URBAN_RURA.apply(lambda c: 0 if c=='U' else 1 if c=='R' else -1).astype(np.int16) # -1 never happens (3 is refugee but is filter out in survey)
+    
     self.df_cluster = self.df_cluster.merge(self.df_survey[['year','survey','hv001']].drop_duplicates(), 
                                             left_on=['DHSYEAR','SURVEY','DHSCLUST'], right_on=['year','survey','hv001'])
     self.df_cluster.drop(columns=['year','survey','hv001'], inplace=True)
@@ -211,26 +235,28 @@ class DHSMIS(WI):
 
   def _iwi_household(self, obj):
     id,row = obj
+    year = str(row.year)
     
     # water (hv201)
-    w1 = WATER[self.country_code][row.year]['low'] #low   1
-    w2 = WATER[self.country_code][row.year]['mid'] #mid   2
-    w3 = WATER[self.country_code][row.year]['high'] #high 3
+    w1 = WATER[self.country_code][year]['low'] #low   1
+    w2 = WATER[self.country_code][year]['mid'] #mid   2
+    w3 = WATER[self.country_code][year]['high'] #high 3
 
     # toilet (hv205)
-    t1 = TOILET[self.country_code][row.year]['low'] #low
-    t2 = TOILET[self.country_code][row.year]['mid'] #mid
-    t3 = TOILET[self.country_code][row.year]['high'] #high
+    t1 = TOILET[self.country_code][year]['low'] #low
+    t2 = TOILET[self.country_code][year]['mid'] #mid
+    t3 = TOILET[self.country_code][year]['high'] #high
 
     # floor (hv213)
-    f1 = FLOOR[self.country_code][row.year]['low'] #low
-    f2 = FLOOR[self.country_code][row.year]['mid'] #mid
-    f3 = FLOOR[self.country_code][row.year]['high'] #high
+    f1 = FLOOR[self.country_code][year]['low'] #low
+    f2 = FLOOR[self.country_code][year]['mid'] #mid
+    f3 = FLOOR[self.country_code][year]['high'] #high
     
     iwi = 0
 
     ### normal variables
-    for k,beta in BETAS.items():
+    for k,obj in BETAS.items():
+        beta = obj['beta']
         x = row.loc[k]
         original = x
 
@@ -241,29 +267,29 @@ class DHSMIS(WI):
         elif k == 'hv201':   # water
             x = 1 if x in w1 else 2 if x in w2 else 3 if x in w3 else 0
             if x==0:
-                print(id, k, row.year, original, 'zero')
-            b = beta[x] if x>0 else 0
+                print(id, k, year, original, 'zero')
+            b = beta[str(x)] if x>0 else 0
             x = 1
             
         elif k == 'hv205': # toilet
             x = 1 if x in t1 else 2 if x in t2 else 3 if x in t3 else 0
             if x==0:
-                print(id, k, row.year, original, 'zero')
-            b = beta[x] if x>0 else 0
+                print(id, k, year, original, 'zero')
+            b = beta[str(x)] if x>0 else 0
             x = 1
             
         elif k == 'hv213': # floor
             x = 1 if x in f1 else 2 if x in f2 else 3 if x in f3 else 0
             if x==0:
-                print(id, k, row.year, original, 'zero')
-            b = beta[x] if x>0 else 0
+                print(id, k, year, original, 'zero')
+            b = beta[str(x)] if x>0 else 0
             x = 1
             
         elif k == 'hv216': # sleeping rooms
             x = 1 if x in [0,1] else 2 if x==2 else 3 if x>=3 else 0
             if x==0:
-                print(id, k, row.year, original, 'zero')
-            b = beta[x] if x>0 else 0
+                print(id, k, year, original, 'zero')
+            b = beta[str(x)] if x>0 else 0
             x = 1
             
         else:
@@ -271,13 +297,13 @@ class DHSMIS(WI):
             b = beta
             
         if x==9:
-            print(id, k, row.year, original, 'nine')
+            print(id, k, year, original, 'nine')
 
         iwi += (b * x)
     
     ### special variables (expensive utensils)
     has_expensive = False
-    for k in ['hv212', 'hv243e', 'hv211', 'hv243d', 'hv243a']:
+    for k in EXPENSIVE_UTENSILS_COLS:
         x = row.loc[k]==1
         has_expensive = has_expensive or x
     iwi += BETA_EXPENSIVE_UTENSILS * int(has_expensive)
@@ -297,6 +323,13 @@ class DHSMIS(WI):
   def _compute_IWI(self, njobs=-1):
     ### The International Wealth Index (IWI)
     ### Jeroen Smits and Roel Steendijk
+    
+    # sequential:
+    # results = []
+    # for id, row in self.df_survey.iterrows():
+    #     results.append(self._iwi_household((id,row)))
+        
+    # parallel:
     results = pqdm(self.df_survey.iterrows(), self._iwi_household, n_jobs=njobs)
     self.df_survey.loc[:,'iwi'] = results
     self.df_survey.iwi = self.df_survey.iwi.astype(np.float32) #.round(2) 
@@ -305,3 +338,9 @@ class DHSMIS(WI):
     tmp = self.df_survey.groupby(['year','survey','hv001']).iwi.agg(['mean','std','size']).reset_index()
     self.df_cluster = self.df_cluster.merge(tmp, left_on=['DHSYEAR','SURVEY','DHSCLUST'], right_on=['year','survey','hv001']).drop(columns=['year','survey','hv001'])
     self.df_cluster.rename(columns={'mean':'mean_iwi', 'std':'std_iwi', 'size':'counts'}, inplace=True)
+    
+    # fill empty std
+    indexes = self.df_cluster.query("counts==1").index
+    if indexes.shape[0] > 0:
+        self.df_cluster.loc[indexes,'std_iwi'] = 0.0
+        print(f'{indexes.shape[0]} records changed (std=0)')

@@ -10,16 +10,22 @@ import h5py
 import ntpath
 import pickle
 import joblib
+from tqdm import tqdm
+from zipfile import ZipFile
+
 import numpy as np
 import pandas as pd
 from shutil import copyfile
+from datetime import datetime  
 from numpy import savez_compressed
+import geopandas as gpd
 
 ################################################################
 # Constants
 ################################################################
 
 from utils.constants import NONE
+from utils.constants import PROJ_DEG
 
 ################################################################
 # Functions: Places (survey or pplaces) files
@@ -99,11 +105,15 @@ def get_places_file(root, years=None, households=False, verbose=True):
     if fn_places is None:
        raise Exception("Survey file for year not found.")
 
+
   return fn_places
 
 ################################################################
 # Functions: Files and paths 
 ################################################################
+
+def path_join(path, *paths):
+  return os.path.join(path, *paths)
 
 def get_prefix_surveys(df=None, root=None, years=None):
   
@@ -144,14 +154,53 @@ def get_files(path, endswith=None, abspath=True):
     files = [os.path.join(path,fn) if not abspath else os.path.abspath(os.path.join(path,fn)) for fn in os.listdir(path) if endswith is None or fn.endswith(endswith)]
     return files
 
+def get_file_inside_zip(pattern, inside_ext, inside_pattern):
+    try:
+        fn1 = get_files_by_pattern(pattern)[0]
+        zipfile = ZipFile(fn1, 'r')
+        fn2 = [name for name in zipfile.namelist() if name.endswith(f'.{inside_ext}') and inside_pattern in name][0]
+        fn = f"{fn1}!{fn2}"
+    except Exception as ex:
+        print(f"[ERROR] ios.py | get_file_inside_zip | {ex}")
+        files = None
+        fn = None
+    return fn
+
+def load_csv_files_from_multiple_zips(fn):
+    df = pd.DataFrame()
+    try:
+        with ZipFile(fn) as z:
+            its = z.namelist()
+            its =  tqdm(its)
+            for filename in its:
+                if not os.path.isdir(filename):
+                    with z.open(filename, mode='r') as f:
+                        tmp = pd.read_csv(f)
+                        df = pd.concat([df,tmp], ignore_index=True)
+    except Exception as ex:
+        print(f"[ERROR] ios.py | load_csv_files_from_multiple_zips | {ex} | fn:{fn}")
+        df = None
+    return df
+
+def get_files_by_pattern(pattern):
+    try:
+        files = glob.glob(pattern)
+    except Exception as ex:
+        print(f"[ERROR] ios.py | get_files_by_pattern | {ex}")
+        files = None
+    return files
+
+def dirname(path):
+    return os.path.dirname(fn)
+    
 def validate_path(path):
-  try:
-    if not os.path.exists(path):
-      os.makedirs(path)
-  except FileExistsError:
-    pass
-  except Exception as ex:
-    print(f"[ERROR] validate_path | ios.py | {ex} | {path}")
+    try:
+        if not exists(path):
+            create_path(path)
+    except FileExistsError:
+        pass
+    except Exception as ex:
+        print(f"[ERROR] validate_path | ios.py | {ex} | {path}")
     
 def copy(sourcefile, targetpath):
     try:
@@ -246,10 +295,10 @@ def save_csv(df, fn, index=True, verbose=True):
     except Exception as ex:
         print(ex)
 
-def load_csv(fn, index_col=0, verbose=False):
+def load_csv(fn, index_col=0, verbose=False, **kwargs):
     df = None
     try:
-        df = pd.read_csv(fn, index_col=index_col, low_memory=False)
+        df = pd.read_csv(fn, index_col=index_col, low_memory=False, **kwargs)
         if verbose:
             print("{} loaded!".format(fn))
     except Exception as ex:
@@ -345,3 +394,20 @@ def read_h5(fn):
     return data
   except Exception as ex:
     print(ex)
+
+def read_geo_csv(fn, lon='lon', lat='lat', index_col=None, crs=PROJ_DEG):
+    df = load_csv(fn=fn, index_col=index_col, verbose=False)
+    gdf = gpd.GeoDataFrame(df, geometry=gpd.GeoSeries.from_xy(df[lon], df[lat]), crs=crs)
+    return gdf
+
+################################################################
+# Functions: STDOUT
+################################################################
+
+def printf(txt):
+  
+  timestamp = time.time()
+  date_time = datetime.fromtimestamp(timestamp)
+  ts = date_time.strftime("%Y-%m-%d %H:%M:%S")
+  
+  print(f"{ts}\t{txt}")

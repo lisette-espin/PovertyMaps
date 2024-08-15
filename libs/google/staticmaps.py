@@ -116,7 +116,8 @@ class StaticMaps(object):
       raise Exception("More than 1 image for the same cluster and settings.")
 
     if len(files) == 0:
-      fn = StaticMaps.get_satellite_img_filename(prefix, self.zoom, self.scale, self.maptype, self.img_type, path=path, img_size=self.img_size, lat=self.lat, lon=self.lon)
+      fn = StaticMaps.get_satellite_img_filename(prefix, self.zoom, self.scale, self.maptype, 
+                                                 self.img_type, path=path, img_size=self.img_size, lat=self.lat, lon=self.lon)
       files = [fn]
       # fn = "{}LA{}-LO{}-ZO{}-SC{}-{}-{}.png".format('' if prefix is None else '{}-'.format(prefix),
       #                                               round(self.lat,10),
@@ -132,13 +133,13 @@ class StaticMaps(object):
     return ios.exists(self.get_image_filename(path, prefix))
     
   @staticmethod
-  def get_prefix(row):
+  def get_prefix(row, gt=False):
     
-    if OSMID in row:
+    if OSMID in row and not gt:
       if not pd.isna(row.OSMID) and row.OSMID not in NONE:
-        return 'OSMID{}'.format(row.OSMID)
+        return 'OSMID{}'.format(int(row.OSMID))
     
-    if GTID in row:
+    if GTID in row or gt:
       return 'Y{}-C{}-U{}'.format(int(row.year), int(row.cluster), int(row.rural)) 
     
     if "cluster_id" in row: 

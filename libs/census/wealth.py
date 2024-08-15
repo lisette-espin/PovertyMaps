@@ -61,7 +61,7 @@ class WI(object):
   def load_data(self):
     pass
 
-  def commpute_indicators(self, njobs=1):
+  def compute_indicators(self, njobs=1):
     pass 
   
   def set_categories(self, bins):
@@ -72,9 +72,8 @@ class WI(object):
     pass
 
   def clean_columns(self):
-    subset = [self.col_ccode, self.col_source, self.col_year, self.col_cluster, self.col_lon, self.col_lat, 
-              self.col_rural, self.col_counts, f"mean_{self.col_indicator}", f"std_{self.col_indicator}", 
-              f"mean_{self.col_indicator}_bin", f"mean_{self.col_indicator}_cat", f"mean_{self.col_indicator}_cat_id"]
+    subset = [self.col_ccode, self.col_source, self.col_year, self.col_cluster, self.col_lon, self.col_lat, self.col_rural, self.col_counts, 
+              f"mean_{self.col_indicator}", f"std_{self.col_indicator}", f"mean_{self.col_indicator}_bin", f"mean_{self.col_indicator}_cat", f"mean_{self.col_indicator}_cat_id"]
     self.df_cluster.loc[:,self.col_id] = self.df_cluster.apply(lambda row: f"{row[self.col_ccode]}{row[self.col_year]:4d}{row[self.col_cluster]:010}", axis=1)
     self.df_cluster = self.df_cluster[[self.col_id]+subset]
     
@@ -116,4 +115,3 @@ class WI(object):
     #codes = [map[i.left] for i in tmp]
     tmp = pd.cut(arr, bins=bins, precision=0, retbins=False, ordered=True, labels=labels) #.codes
     return tmp
-    

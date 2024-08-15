@@ -27,7 +27,7 @@ def run(root, years, distance, meters, njobs=1):
 
   distance = validations.validate_max_distance_antenna(distance)
   meters = validations.validate_meters(meters)
-  df_places_new = opencellid.update_opencellid_features(fn_cells, fn_places, distance, meters, njobs)
+  df_places_new = opencellid.update_opencellid_features_fast(fn_cells, fn_places, distance, meters, njobs)
   print(df_places_new.head())
   print(df_places_new.shape)
 

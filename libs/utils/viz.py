@@ -17,8 +17,6 @@ from sklearn.metrics import confusion_matrix
 # Dependencies: Local
 ################################################################
 
-# from data_utilities import wv_util as wv
-# from data_utilities import aug_util as au
 from utils.constants import *
 
 ################################################################
@@ -48,21 +46,6 @@ def imgshow(fn):
   plt.show()
   plt.close()
 
-#def imglblshow(fn_img, bboxes, classes, allclasses, showlabels):
-#  imgarr = wv.get_image(fn_img)
-#  
-#  ax = plt.subplot(1,1,1)
-#  plt.axis('off')
-#  #xmin,ymin,xmax,ymax
-#  labelled = au.draw_bboxes(imgarr,bboxes)
-#  plt.imshow(labelled)
-#
-#  if showlabels:
-#    for bbox,label in zip(*(bboxes,classes)):
-#      ax.text(s=allclasses[label], x=bbox[0]+1, y=bbox[1]-1, fontsize=12, bbox={'facecolor': 'red', 'pad': 1, 'edgecolor':'none'})
-#
-#  plt.show()
-#  plt.close()
 
 def convert_tif_to_jpg(fn):
     im = Image.open(fn)
@@ -163,7 +146,7 @@ def plot_distribution(df, column, nbins=10, labels=None, quantiles=False, ylog=F
   plt.close()
 
 def plot_counts(df, x, row, xindex=False, xlabel=None, ylabel=None, fn=None):
-  
+ 
   rows = df[row].unique()
   fig,axes = plt.subplots(rows.size, 1, figsize=(6,6))
   data = df.copy()

@@ -80,7 +80,7 @@ CNN_VALIDATION_SPLIT = 0.3
 # FB MARKETING
 ################################################
 
-FBM_API_VERSION = 'v13.0' #'v12'
+FBM_API_VERSION = 'v20.0' #'v17.0' #'v13.0' #'v12'
 
 FBM_NOT_YET = -1
 FBM_LOADED_DONE = 0
@@ -97,6 +97,14 @@ FBM_ERR_SUBCODE_QUOTA = 2446079
 
 FBM_HQUOTA = 2 # Quota of tokens gets restarted every 2 hours
 FBM_DEFAULT_WRONG_LOCATION = np.nan #-1
+
+
+################################################
+# FB MOVEMENT DISTRIBUTION
+################################################
+
+FBMD_DISTANCE_GROUPS = ['0', '(0, 10)', '[10, 100)', '100+']
+
 
 ################################################
 # CatBoost METADATA
@@ -121,21 +129,34 @@ ALL_FEATURES = 'all'
 ################################################
 FONT_SCALE = 1.5
 
+################################################
+# TRANSFERABILITY
+################################################
+SIMILARITY_DISTANCES = ['D3', 'D4k5', 'D4k10', 'D4k20', 'D4k50', 'D4k100'] # IF any of these THEN metric: the lower the better
 
 ################################################
 # UTILS
 ################################################
+import os 
+current_path = os.path.dirname(os.path.realpath(__file__))
+print(current_path)
+
+def load_json(fn):
+  import json
+  with open(fn, 'r') as f:
+    return json.load(f)
+      
+AVAILABLE_GT_SOURCE_FN = os.path.join(current_path, '../../resources/survey/available_source.json')
+GT_SOURCES = load_json(AVAILABLE_GT_SOURCE_FN)
+
+AVAILABLE_COUNTRY_METADATA_FN = os.path.join(current_path, '../../resources/survey/available_metadata.json')
+COUNTRIES = load_json(AVAILABLE_COUNTRY_METADATA_FN)
+
 YES = ['y','yes','1',1,True,'True','true']
 NO = ['n','no','0',0,False,'False','false']
 NONE = [None, np.nan, '', 'none', ' ', 'nan', 'None']
 PLOTEXT = 'png'
-COUNTRIES = {'Sierra Leone':{'code':'SL', 'years':'2016,2019', 'tz':'Africa/Freetown'}, 
-             'Uganda':{'code':'UG', 'years':"2016,2018", 'tz':'Africa/Kampala'},
-             'Hungary':{'code':'HU', 'years':'2018', 'tz':'Europe/Budapest'},
-             'Zimbabwe':{'code':'ZW', 'years':'2015', 'tz':'Africa/Harare'},
-             'Ecuador':{'code':'EC', 'years':'2021', 'tz':'America/Guayaquil'}}
-
-REGRESSION_VARS = ['mean_wi','std_wi'] #['dhs_mean_iwi','dhs_std_iwi']
+REGRESSION_VARS = ['mean_wi','std_wi']
 LON, LAT = 'lon', 'lat'
 RURAL = 'rural'
 OSMID = 'OSMID'
@@ -145,6 +166,7 @@ WEALTH = 'wi'
 CLUSTER = 'cluster'
 YMAX_DHS = 100
 YMAX_INGATLAN = 4
+
 
 ################################################
 # DHS
@@ -170,12 +192,13 @@ EXTRA = {0:0, 1:10000}
 EXTRAS_ALLOWED = {0:0, 1:1/100.}
 LABEL = {0:'URBAN', 1:'RURAL'}
 DISTCOLS = ['cluster_id','cluster_year','cluster_number','cluster_rural',f'mean_{WEALTH}',f'std_{WEALTH}','OSMID','pplace_cluster_distance','pplace_rural']
-
+EXPENSIVE_UTENSILS_COLS = ['hv212', 'hv243e', 'hv211', 'hv243d', 'hv243a']
 
 ##############################################################################
 # DHS IWI
 # Betas: https://link.springer.com/article/10.1007/s11205-014-0683-x/tables/1
 # https://globaldatalab.org/iwi/using/
+# DHS file: <CCODE>HR**FL.MAP
 ##############################################################################
 
 ### Water supply (hv201)
@@ -183,67 +206,31 @@ DISTCOLS = ['cluster_id','cluster_year','cluster_number','cluster_rural',f'mean_
 ### - middle quality is public tap, protected well, tanker truck, etc.;
 ### - low quality is unprotected well, spring, surface water, etc.
 ### 30 DUG WELL (OPEN/PROTECTED) , should it go to mid instead of low?
-
-WATER = {'UG':{2006:{'high':[11,12,71],'mid':[13,31,33,34,41,61],'low':[20,21,22,23,30,32,35,36,40,42,43,44,45,46,51,62,91]},
-               2009:{'high':[10,11,12,71],'mid':[13,31,33,34,41,61],'low':[20,21,22,23,30,32,35,40,42,43,44,45,46,51,62]},
-               2011:{'high':[10,11,12,71],'mid':[13,31,33,34,41,61,71,72],'low':[20,21,22,23,30,32,35,36,40,42,43,44,45,46,51,62]},
-               2014:{'high':[11,12,91],'mid':[13,31,41,61,63,71],'low':[21,22,32,42,43,44,51,62,81]},
-               2016:{'high':[11,12,13,91],'mid':[14,31,41,61,63,72,92],'low':[21,32,42,43,51,71,81]},
-               2018:{'high':[11,12,13,91],'mid':[14,31,41,61,63,72,92],'low':[21,32,42,43,51,71,81]}},
-         'SL':{2008:{'high':[10,11,12,71], 'mid':[13,31,41,61], 'low':[20,21,30,32,40,42,43,51,62]},
-               2013:{'high':[10,11,12,91,71], 'mid':[13,31,41,61,92], 'low':[20,21,30,32,40,42,43,51,62]},
-               2016:{'high':[10,11,12,13,71], 'mid':[14,31,41,61,72], 'low':[20,21,30,32,40,42,43,51,62]},
-               2019:{'high':[10,11,12,13,71], 'mid':[14,31,41,61,72], 'low':[20,21,30,32,40,42,43,51,62,81]}},
-         'ZW':{2015:{'high':[10,11,12,13,71], 'mid':[14,31,41,61], 'low':[20,21,30,32,40,42,43,51,62]}}}
+DHS_WATER_CODES_FN = os.path.join(current_path, '../../resources/survey/dhs_water_codes.json')
+WATER = load_json(DHS_WATER_CODES_FN)
 
                 
 ### Toilet facility (hv205)
 ### - high quality is any kind of private flush toilet; 
 ### - middle quality is public toilet, improved pit latrine, etc.;
 ### - low quality is traditional pit latrine, hanging toilet, or no toilet facility.
-
-TOILET = {'UG':{2006:{'high':[10,11],'mid':[21,23],'low':[20,22,24,25,30,31,41,42,43]},
-               2009:{'high':[10,11],'mid':[21,23],'low':[20,22,24,25,30,31,41,42,43]},
-               2011:{'high':[1,10,11],'mid':[2,4,21,23],'low':[3,5,6,7,8,9,20,22,24,25,30,31,41,43,44]},
-               2014:{'high':[11,12,13,14,15],'mid':[21,22],'low':[23,24,25,31,41,42,43,51,61]},
-               2016:{'high':[11,12,13,14,15],'mid':[21,22],'low':[23,31,41,42,43,51,61]},
-               2018:{'high':[11,12,13,14,15],'mid':[21,22],'low':[23,31,41,42,43,51,61]}},
-         'SL':{2008:{'high':[10,11,12,13,14,15], 'mid':[21,22], 'low':[20,23,30,31,41,42,43,71]},
-               2013:{'high':[10,11,12,13,14,15], 'mid':[21,22], 'low':[20,23,30,31,41,42,43]},
-               2016:{'high':[10,11,12,13,14,15], 'mid':[21,22], 'low':[20,23,30,31,41,42,43]},
-               2019:{'high':[10,11,12,13,14,15], 'mid':[21,22], 'low':[20,23,30,31,41,42,43]}},
-         'ZW':{2015:{'high':[10,11,12,13,14,15], 'mid':[21,22], 'low':[20,23,30,31,41,42,43]}}}
+DHS_TOILET_CODES_FN = os.path.join(current_path, '../../resources/survey/dhs_toilet_codes.json')
+TOILET = load_json(DHS_TOILET_CODES_FN)
 
                           
 ### Floor quality (hv213)
 ### - high quality is finished floor with parquet, carpet, tiles, ceramic etc.; 
 ### - middle quality is cement, concrete, raw wood, etc. 
 ### - low quality is none, earth, dung etc., 
-FLOOR = {'UG':{2006:{'high':[30,31,33],'mid':[34,35,36],'low':[10,11,12,20,]},
-               2009:{'high':[30,31,33],'mid':[34,35,36],'low':[10,11,12,20]},
-               2011:{'high':[30,31,33],'mid':[34,35,36],'low':[10,11,12,20]},
-               2014:{'high':[30,31,32],'mid':[21,22,33,34,35],'low':[10,11,12,20]},
-               2016:{'high':[30,31,33,35],'mid':[21,22,32,34,36,37],'low':[10,11,12,20,]},
-               2018:{'high':[30,31,33,35],'mid':[21,22,32,34,36,37],'low':[10,11,12,20]}},
-         'SL':{2008:{'high':[30,31,32,33,35], 'mid':[13,21,22,34], 'low':[10,11,12,20]},                          
-               2013:{'high':[30,31,32,33,35], 'mid':[21,22,34], 'low':[10,11,12,20]},
-               2016:{'high':[31,32,33,35], 'mid':[21,22,34], 'low':[11,12]},
-               2019:{'high':[30,31,32,33,35], 'mid':[21,22,34], 'low':[10,11,12,20]}},
-         'ZW':{2015:{'high':[30,31,32,33,35], 'mid':[21,22,34], 'low':[10,11,12,20]}}} # 22 remove?
+DHS_FLOOR_CODES_FN = os.path.join(current_path, '../../resources/survey/dhs_floor_codes.json')
+FLOOR = load_json(DHS_FLOOR_CODES_FN)
                           
-BETAS = {'hv208':8.612657,  # tv
-         'hv209':8.429076,  # fridge
-         'hv221':7.127699,  # telephone
-         'hv212':4.651382,  # car
-         'hv210':1.846860,  # bike
-         'hv206':8.056664,  # electricity 
-         'hv201':{1:-6.306477,2:-2.302023,3:7.952443},  # water
-         'hv213':{1:-7.558471,2:1.227531, 3:6.107428},  # floor 
-         'hv205':{1:-7.439841,2:-1.090393,3:8.140637},  # toilet
-         'hv216':{1:-3.699681,2:0.384050, 3:3.445009}}  # sleeping rooms
-BETA_CHEAP_UTENSILS = 4.118394     # cheap utensils
-BETA_EXPENSIVE_UTENSILS = 6.507283 # expensive utensils 
-CONSTANT = 25.004470
+DHS_BETAS_FN = os.path.join(current_path, '../../resources/survey/dhs_betas.json')
+BETAS = load_json(DHS_BETAS_FN)
+
+BETA_CHEAP_UTENSILS = BETAS['cheap']['beta']
+BETA_EXPENSIVE_UTENSILS = BETAS['expensive']['beta']
+CONSTANT = BETAS['constant']['beta']
 
 COLS_SURVEY = ['country','year','survey','hhid','hv001','hv002','hv024','hv025','hv270','hv271','hv005','hv243e','hv211','hv243d','hv243a']
 COLS_SURVEY.extend(BETAS.keys())
@@ -251,12 +238,12 @@ COLS_CLUSTER = ['DHSCC','DHSYEAR','DHSCLUST','URBAN_RURA','LATNUM','LONGNUM','SO
 
 
 
-################################################
-# XGBOOST (deprecated)
-# https://xgboost.readthedocs.io/en/latest/python/python_api.html
-# https://towardsdatascience.com/be-careful-when-interpreting-your-features-importance-in-xgboost-6e16132588e7
-# https://datascience.stackexchange.com/questions/12318/how-to-interpret-the-output-of-xgboost-importance
-################################################
+# ################################################
+# # XGBOOST
+# # https://xgboost.readthedocs.io/en/latest/python/python_api.html
+# # https://towardsdatascience.com/be-careful-when-interpreting-your-features-importance-in-xgboost-6e16132588e7
+# # https://datascience.stackexchange.com/questions/12318/how-to-interpret-the-output-of-xgboost-importance
+# ################################################
 XGBOOST_IMPORTANCE_TYPE = 'gain'
 BLUE = "#5975a4" 
 XGB_TUNING_ITER = 200

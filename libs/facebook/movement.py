@@ -33,7 +33,9 @@ from utils.constants import *
 # Class
 ###############################################################
 class FacebookMovement(object):
-
+  '''
+  Movement between tiles during COVID-19 crisis (deprecated)
+  '''
   def __init__(self, country_name, country_code, path, testing=False):
     self.country_name = country_name  # country (string) name
     self.country_code = country_code  # code (string) code, eg. SL for Sierra Leone and UG for Uganda
@@ -74,10 +76,11 @@ class FacebookMovement(object):
     #     sum all nbaselines for each edge (Regardles or dow or time)
     # 2.2 unique length_km for each edge
     edges = self.gdf_data[['start','end','dow','time','n_baseline','length_km']]
-    edges = edges.groupby(['start','end','dow','time']).agg({'length_km':lambda x:x.unique(),
+    edges = edges.groupby(['start','end','dow','time']).agg({'length_km': lambda x:x.unique()[0] if x.nunique()==1 else x.mode()[0],
                                                              'n_baseline':lambda x: 1.0 if x.nunique() == 1 and x.unique().min() == 1.0 else 
                                                              x[x>1].mode()[0] if x.mode()[0]==1.0 else x.mode()[0]}).reset_index()
-    edges = edges.groupby(['start','end']).agg({'length_km':lambda x:x.unique(),
+    
+    edges = edges.groupby(['start','end']).agg({'length_km': lambda x:x.unique()[0] if x.nunique()==1 else x.mode()[0],
                                                 'n_baseline':'sum'}).reset_index()
     edges.rename(columns={'start':'source', 'end':'target', 'n_baseline':'weight', 'length_km':'distance'}, inplace=True)
 
@@ -88,13 +91,15 @@ class FacebookMovement(object):
     # 4. edge list (source, target, weight)
     edges.loc[:,'source'] = edges.source.apply(lambda c: np.where(self.nodes == c)[0][0])
     edges.loc[:,'target'] = edges.target.apply(lambda c: np.where(self.nodes == c)[0][0])
-
+    edges = edges[['source','target','weight','distance']]
+    
     # 5. create sparse matrix
-    source_index, target_index, distances, weights = np.hsplit(edges.values, 4)
-    self.M = csr_matrix((weights.ravel(), (source_index.ravel(), target_index.ravel())), shape=(n, n))                  # number of people
-    self.A = csr_matrix((np.ones(self.M.count_nonzero()), (source_index.ravel(), target_index.ravel())), shape=(n, n))  # number of places
-    self.D = csr_matrix((distances.ravel(), (source_index.ravel(), target_index.ravel())), shape=(n, n))                 # average traversed distance
-
+    source, target, weights, distances = np.hsplit(edges.values, 4)
+    self.M = csr_matrix((weights.ravel(), (source.ravel(), target.ravel())), shape=(n, n))                  # number of people
+    self.A = csr_matrix((np.ones(self.M.count_nonzero()), (source.ravel(), target.ravel())), shape=(n, n))  # number of places
+    self.D = csr_matrix((distances.ravel(), (source.ravel(), target.ravel())), shape=(n, n))                 # average traversed distance
+    self.edges = edges
+    
   def get_features(self, df):
     ### 0. lon,lat columns
     #id,lon,lat = ("DHSID","LONGNUM","LATNUM") if 'LATNUM' in df.columns else ('OSMID','lon','lat')

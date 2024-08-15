@@ -31,7 +31,7 @@ from utils import constants
 from utils.augmentation import RandomColorDistortion
 
 ROOT = '../data'
-COUNTRIES = {k:v for k,v in constants.COUNTRIES.items() if k in ['Sierra Leone','Uganda','Hungary']}
+COUNTRIES = {k:v for k,v in constants.COUNTRIES.items() if k in ['Sierra Leone','Uganda','Rwanda','Liberia','Gabon','South Africa','Hungary']}
 MODELS = OrderedDict({'catboost':'CB', 
                       'weighted_catboost':'CB$_w$', 
                       'cnn':'CNN', 
@@ -43,32 +43,38 @@ MODELS = OrderedDict({'catboost':'CB',
 MODELS_CB = [MODELS['catboost'], MODELS['weighted_catboost']]
 MODELS_CNN = [MODELS['cnn'], MODELS['cnn_aug']]
 MODELS_FMAP = [MODELS['cnn+catboost'], MODELS['cnn+weighted_catboost'], MODELS['cnn_aug+catboost'], MODELS['cnn_aug+weighted_catboost']]
-OUTPUT = '../paper/results/pplaces_inference'
+OUTPUT = 'results/pplaces_inference'
 
 #################################################################################
 # Main
 #################################################################################
 
-def run(ccode, model, fsource=None, year=None, img_width=None, img_height=None):
+def run(ccode, model, output_root, fsource=None, year=None, img_width=None, img_height=None):
   country = validate_country(ccode)
   validate_model(model)
-  if already_exists(ccode, model, year, fsource=fsource):
+  ios.validate_path(os.path.join(output_root,OUTPUT))
+    
+  if already_exists(ccode, model, year, output_root, fsource=fsource):
     print("[INFO] Already exists. Nothing to do.")
   else:
-    country_prediction(ccode, country, model, year, fsource=fsource, img_width=img_width, img_height=img_height)
+    country_prediction(ccode=ccode, country=country, model=model, output_root=output_root, 
+                       year=year, fsource=fsource, img_width=img_width, img_height=img_height)
   
-def get_predictions_fn(ccode, model, year=None, fsource=None):
+def get_predictions_fn(ccode, model, output_root, year=None, fsource=None):
   postfix1 = "" if year is None else f"_{year}"
   postfix2 = '' if fsource is None else f"_{'_'.join(fsource.split(','))}"
-  fn = os.path.join(OUTPUT,f'{ccode}_{model}{postfix1}{postfix2}.csv')
+
+  output_dir = os.path.join(output_root, OUTPUT)
+  fn = os.path.join(output_dir,f'{ccode}_{model}{postfix1}{postfix2}.csv')
   return fn
 
-def already_exists(ccode, model, year, fsource=None):
-  fn = get_predictions_fn(ccode, model, year, fsource=fsource)
+def already_exists(ccode, model, year, output_root, fsource=None):
+  fn = get_predictions_fn(ccode, model, output_root, year=year, fsource=fsource)
   ios.validate_path(os.path.dirname(fn))
   return ios.exists(fn)
   
 def validate_country(ccode):
+  print(ccode)
   country = [k for k,obj in COUNTRIES.items() if obj['code']==ccode]
   if len(country)==0:
     raise Exception("Country does not exist.")
@@ -83,10 +89,13 @@ def get_model_fn(country, model, year=None, fsource=None):
   # Country's models
   dhsloc = 'none'
   ttype = 'all'
+  
+  print('---------------',ROOT, country, year, COUNTRIES[country]['years'])
+  
   if year is None:
     prefix = ios.get_prefix_surveys(df=None, root=os.path.join(ROOT,country), years=COUNTRIES[country]['years'])
   else:
-    prefix = ios.get_prefix_surveys(df=None, root=os.path.join(ROOT,country), years=[year])
+    prefix = ios.get_prefix_surveys(df=None, root=os.path.join(ROOT,country), years=year)
 
   features_postfix = '*' if fsource is None else f"*{'_'.join(fsource.split(','))}"
 
@@ -153,7 +162,7 @@ def get_model_fn(country, model, year=None, fsource=None):
   print(f"[INFO] {fn} to be loaded.")
   return fn
   
-def country_prediction(ccode, country, model, year=None, fsource=None, img_width=None, img_height=None):
+def country_prediction(ccode, country, model, output_root, year=None, fsource=None, img_width=None, img_height=None):
   print("============================================================")
   print(f"Country: {country} ({ccode}) - Model: {model} - Year: {year} - Features: {fsource}")
   print("============================================================")
@@ -195,22 +204,23 @@ def country_prediction(ccode, country, model, year=None, fsource=None, img_width
   elif model_name in MODELS_CB:
     df_pred = p_cb(model_fn, model_name, country, ccode,
                     root, y_attribute, 
-                    features_source)
+                    features_source, output_root)
   elif model_name in MODELS_FMAP:
     df_pred = p_cnn_cb(model_fn, model_name, country, ccode,
                       root, y_attribute, 
-                      features_source, layer_id)
+                      features_source, layer_id, output_root)
   else:
     print(f"[ERROR] {model_name} mistmatch {model_fn}")
   
   # Saving predictions
-  fn_pred = get_predictions_fn(ccode, model, year, fsource=fsource)
+  fn_pred = get_predictions_fn(ccode, model, output_root, year=year, fsource=fsource)
   ios.save_csv(df_pred, fn_pred)
   print(f'[INFO] {fn_pred} saved!')
   
   # saving fmap
   if fmap is not None:
-    fn_fmap = os.path.join(OUTPUT, 'fmaps', f"{ccode}_{model}.npz")
+    output_dir = os.path.join(output_root, OUTPUT)
+    fn_fmap = os.path.join(output_dir, 'fmaps', f"{ccode}_{model}.npz")
     ios.validate_path(os.path.dirname(fn_fmap))
     savez_compressed(fn_fmap, fmap) 
 
@@ -285,7 +295,7 @@ def get_fmap(model_fn, layer_id, X):
 # Prediction using CatBoost
 #################################################################################
 
-def p_cb(model_fn, model_name, country, ccode, root, y_attribute, features_source):
+def p_cb(model_fn, model_name, country, ccode, root, y_attribute, features_source, output_root):
   
   # Setup
   rs = int(model_fn.split('-rs')[-1].split('/')[0])
@@ -313,7 +323,7 @@ def p_cb(model_fn, model_name, country, ccode, root, y_attribute, features_sourc
   del(model)
 
   # Save features (not needed but just in case for vis)
-  save_features(pplaces, country, ccode, features_source=features_source)
+  save_features(pplaces, country, ccode, output_root, features_source=features_source)
   
   # return results
   return prepare_output(y_pred, pplaces.reset_index(), y_attribute)
@@ -323,7 +333,7 @@ def p_cb(model_fn, model_name, country, ccode, root, y_attribute, features_sourc
 #################################################################################
 
 
-def p_cnn_cb(model_fn, model_name, country, ccode, root, y_attribute, features_source, layer_id):
+def p_cnn_cb(model_fn, model_name, country, ccode, root, y_attribute, features_source, layer_id, output_root):
   
   # Setup
   rs = int(model_fn.split('-rs')[-1].split('/')[0])
@@ -337,7 +347,7 @@ def p_cnn_cb(model_fn, model_name, country, ccode, root, y_attribute, features_s
   # Data
   print("[INFO] loading fmap...")
   cnn_model_name, cnn_folder = get_cnn_model_name_from_combined(model_fn)
-  fmaps = load_fmap(ccode, cnn_model_name, cnn_folder)
+  fmaps = load_fmap(ccode, cnn_model_name, cnn_folder, output_root)
 
   print("[INFO] loading X...")
   pplaces = Data.get_pplaces(root)
@@ -358,15 +368,16 @@ def get_cnn_model_name_from_combined(model_fn):
   print(f"[INFO] \n-CB:{model_fn}\n-CNN:{cnn_folder}\n-CNN MODEL:{cnn_model}")
   return cnn_model, cnn_folder
   
-def load_fmap(ccode, model_name, cnn_folder):
+def load_fmap(ccode, model_name, cnn_folder, output_root):
   if model_name is None:
     raise Exception("model name is None.")
 
-  path = os.path.join(OUTPUT,'fmaps')
+  output_dir = os.path.join(output_root, OUTPUT)
+  path = os.path.join(output_dir,'fmaps')
   fname = f"{ccode}_{model_name}.npz"
   target = os.path.join(path, fname)
   if not ios.exists(path):
-    raise Exception("Make sure to run first CNN (there the fmaps are created)")
+    raise Exception("Make sure to run first 'batch_infer_poverty_maps.py -model CNN' (there the fmaps are created)")
     
   files = [fn for fn in glob.glob(target)]
   if len(files) == 0 or len(files) > 1:
@@ -380,10 +391,11 @@ def load_fmap(ccode, model_name, cnn_folder):
 # Others
 #################################################################################
 
-def save_features(df, country, ccode, features_source=None):
+def save_features(df, country, ccode, output_root, features_source=None):
   fsource = features_source.replace('_',',')
   postfix = f"_{'_'.join(fsource.split(','))}" if fsource is not None else ''
-  fn = os.path.join(OUTPUT,f'{ccode}_features{postfix}.csv')
+  output_dir = os.path.join(output_root, OUTPUT)
+  fn = os.path.join(output_dir,f'{ccode}_features{postfix}.csv')
   if not ios.exists(fn):
     df.loc[:,'country'] = country
     df.loc[:,'ccode'] = ccode
@@ -395,11 +407,12 @@ def save_features(df, country, ccode, features_source=None):
 
 if __name__ == '__main__':
   parser = argparse.ArgumentParser()
-  parser.add_argument("-ccode", help="Country code (UG: Uganda, SL: Sierra Leone, HU: Hungary)", type=str, required=True)
+  parser.add_argument("-ccode", help="Country code (UG: Uganda, SL: Sierra Leone, GA: Gabon, RW: Rwanda, LB: Liberia, HU: Hungary)", type=str, required=True)
   parser.add_argument("-model", help="Model to use for inference (CB, CBw, CNN, CNNa, CNN+CB, CNN+CBw, CNNa+CB, CNNa+CBw).", type=str, required=True, default='CB')
+  parser.add_argument("-output", help="Folder where to store all results.", type=str, required=True, default='../paper')
   parser.add_argument("-fsource", help="Data source of features Xs: all, OCI, FBM, FBP, FBMV, NTLL, OSM", type=str, default=None, required=False)
-  parser.add_argument("-year", help="Year of survey", type=int, required=False, default=None)
-  parser.add_argument("-imgwidth", help="Image width (eg. 640 for SL and UG, or 160 for HU)", type=int, default=None)
+  parser.add_argument("-year", help="Year of survey", type=str, required=True, default=None)
+  parser.add_argument("-imgwidth", help="Image width (eg. 640 for SL, UG, RW, LB, and GA, or 160 for HU)", type=int, default=None)
   parser.add_argument("-imgheight", help="Image width", type=int, default=None)
   
   args = parser.parse_args()
@@ -407,5 +420,7 @@ if __name__ == '__main__':
     print("{}: {}".format(arg, getattr(args, arg)))
 
   start_time = time.time()
-  run(args.ccode, args.model, args.fsource, args.year, args.imgwidth, args.imgheight)
+  run(args.ccode, args.model, args.output, args.fsource, args.year, args.imgwidth, args.imgheight)
   print("--- %s seconds ---" % (time.time() - start_time))
+  
+  # ../paper/  

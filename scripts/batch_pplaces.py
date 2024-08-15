@@ -32,12 +32,12 @@ def run(root, load=False):
 
   country = root.split("/")[-2 if root.endswith('/') else -1]
   print("country:",country)
-  code = COUNTRIES[country]['code']
-  print("code:",code)
+  ccode = COUNTRIES[country]['code3']
+  print("ccode3:",ccode)
   cachedir = os.path.join(root,'cache','OSMPP')
 
   osmppl = OSM()
-  osmppl.get_populated_places_by_country(code, fn=fn_places, load=load, cache_dir=cachedir)
+  osmppl.get_populated_places_by_country(country, ccode, fn=fn_places, load=load, cache_dir=cachedir)
   print(osmppl.ppl.shape)
   print(fn_places)
 
