@@ -1,4 +1,6 @@
 .ipynb_checkpoints
 __pycache__
 ground_truth.csv
-residuals.csv
+residuals.cs
+*old*
+v
