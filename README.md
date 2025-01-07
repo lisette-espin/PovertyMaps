@@ -60,8 +60,8 @@ Lisette Espín-Noboa, János Kertész, and Márton Karsai. 2023. Interpreting we
 --->
 
 ### A Comparative Analysis of Wealth Index Predictions (SoGood@ECMLPKDD'2024)
-*Latest pre-print:* [https://bit.ly/PovertyMapsECMLPKDD24-preprint](https://bit.ly/PovertyMapsECMLPKDD24-preprint)
-<!--- *Pre-print:* [https://arxiv.org/abs/2408.01631](https://arxiv.org/abs/2408.01631) --->
+<!--- *Latest pre-print:* [https://bit.ly/PovertyMapsECMLPKDD24-preprint](https://bit.ly/PovertyMapsECMLPKDD24-preprint) --->
+*Pre-print:* [https://arxiv.org/abs/2408.01631](https://arxiv.org/abs/2408.01631)
 
 ---
 
